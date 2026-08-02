@@ -3,7 +3,7 @@ import axios from "axios";
 // Create a single axios instance used by all API calls.
 // baseURL points to the Django backend running locally.
 const api = axios.create({
-  baseURL: "https://abc-xyz.trycloudflare.com",
+  baseURL: "https://nellore-die-cutting.onrender.com",
   headers: {
     "Content-Type": "application/json",
   },
