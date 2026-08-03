@@ -16,6 +16,7 @@ DEBUG = False
 
 ALLOWED_HOSTS = [
     "nellore-die-cutting.onrender.com",
+    "jahanur07.pythonanywhere.com",
     "localhost",
     "127.0.0.1",
 ]
