@@ -7,10 +7,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Security
 # -----------------------------------------------------------------------------
 
-SECRET_KEY = os.getenv(
-    "SECRET_KEY",
-    "django-insecure-a20vnmq7ljx2yp#uxye29*s9=wnf__9ol*66@f1-3l81t&q6&w",
-)
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEBUG = False
 
