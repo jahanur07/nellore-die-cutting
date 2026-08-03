@@ -9,11 +9,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = "django-insecure-your-long-secret-key"
 
-
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    "nellore-die-cutting.onrender.com",
     "jahanur07.pythonanywhere.com",
     "localhost",
     "127.0.0.1",
@@ -31,8 +29,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    "rest_framework",
     "corsheaders",
+    "rest_framework",
 
     "accounts",
     "tokens",
@@ -117,24 +115,23 @@ AUTH_PASSWORD_VALIDATORS = [
 # -----------------------------------------------------------------------------
 
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
 
 USE_I18N = True
-
 USE_TZ = True
 
 # -----------------------------------------------------------------------------
-# Static / Media
+# Static & Media
 # -----------------------------------------------------------------------------
 
 STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 # -----------------------------------------------------------------------------
-# Django REST Framework
+# REST Framework
 # -----------------------------------------------------------------------------
 
 REST_FRAMEWORK = {
@@ -144,29 +141,24 @@ REST_FRAMEWORK = {
 }
 
 # -----------------------------------------------------------------------------
+# Frontend URL
+# -----------------------------------------------------------------------------
+
+FRONTEND_URL = "https://nellore-die-cutting-rho.vercel.app"
+
+# -----------------------------------------------------------------------------
 # Email
 # -----------------------------------------------------------------------------
 
-FRONTEND_URL = os.getenv(
-    "FRONTEND_URL",
-    "https://nellore-die-cutting-rho.vercel.app",
-)
+DEFAULT_FROM_EMAIL = "no-reply@nellorediecutting.local"
 
-DEFAULT_FROM_EMAIL = os.getenv(
-    "DEFAULT_FROM_EMAIL",
-    "no-reply@nellorediecutting.local",
-)
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
-EMAIL_BACKEND = os.getenv(
-    "EMAIL_BACKEND",
-    "django.core.mail.backends.smtp.EmailBackend",
-)
-
-EMAIL_HOST = os.getenv("EMAIL_HOST", "")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+EMAIL_HOST = ""
+EMAIL_PORT = 587
+EMAIL_HOST_USER = ""
+EMAIL_HOST_PASSWORD = ""
+EMAIL_USE_TLS = True
 
 # -----------------------------------------------------------------------------
 # CORS
@@ -174,10 +166,17 @@ EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
 
 CORS_ALLOWED_ORIGINS = [
     "https://nellore-die-cutting-rho.vercel.app",
+    "https://jahanur07.pythonanywhere.com",
     "http://localhost:5173",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
+
+# -----------------------------------------------------------------------------
+# Default primary key field type
+# -----------------------------------------------------------------------------
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # -----------------------------------------------------------------------------
 # Logging
@@ -193,6 +192,6 @@ LOGGING = {
     },
     "root": {
         "handlers": ["console"],
-        "level": "DEBUG",
+        "level": "INFO",
     },
 }
