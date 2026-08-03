@@ -165,8 +165,7 @@ EMAIL_USE_TLS = True
 # -----------------------------------------------------------------------------
 
 CORS_ALLOWED_ORIGINS = [
-    "https://nellore-die-cutting-rho.vercel.app",
-    "https://jahanur07.pythonanywhere.com",
+    "https://nellore-die-cutting.vercel.app",
     "http://localhost:5173",
 ]
 
