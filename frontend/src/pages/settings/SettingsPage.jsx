@@ -4,6 +4,7 @@ import {
   FaCalendarAlt,
   FaCog,
   FaDatabase,
+  FaDownload,
   FaEnvelope,
   FaFileInvoice,
   FaLock,
@@ -15,12 +16,20 @@ import {
   FaTools,
   FaUpload,
   FaUserShield,
+  FaUserPlus,
   FaWeight,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
 
 import Sidebar from "../../components/layout/Sidebar";
-import { getSettings, updateSettings, uploadLogo } from "../../services/settingsService";
+import {
+  downloadDataBackup,
+  getDataSummary,
+  getSettings,
+  updateSettings,
+  uploadLogo,
+} from "../../services/settingsService";
+import { createUser, getUsers, updateUser } from "../../services/userService";
 
 const TABS = [
   { key: "shop", label: "Shop Information", icon: <FaStore /> },
@@ -95,6 +104,17 @@ function SettingsPage() {
   const [success, setSuccess] = useState("");
 
   const [formData, setFormData] = useState(DEFAULT_SETTINGS);
+  const [users, setUsers] = useState([]);
+  const [dataSummary, setDataSummary] = useState(null);
+  const [userForm, setUserForm] = useState({
+    username: "",
+    email: "",
+    mpin: "",
+    role: "STAFF",
+    department: "",
+  });
+  const [userSaving, setUserSaving] = useState(false);
+  const [backupLoading, setBackupLoading] = useState(false);
 
   const [canEdit, setCanEdit] = useState(false);
   const [editLocked, setEditLocked] = useState(true);
@@ -133,6 +153,15 @@ function SettingsPage() {
   useEffect(() => {
     loadSettings();
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "users") {
+      getUsers().then(setUsers).catch(() => setError("Unable to load users."));
+    }
+    if (activeTab === "backup") {
+      getDataSummary().then(setDataSummary).catch(() => setError("Unable to load data summary."));
+    }
+  }, [activeTab]);
 
   const updateField = (name, value) => {
     setFormData((current) => ({ ...current, [name]: value }));
@@ -244,6 +273,57 @@ function SettingsPage() {
     }
   };
 
+  const handleCreateUser = async (event) => {
+    event.preventDefault();
+    if (disabled) return;
+    setUserSaving(true);
+    setError("");
+    setSuccess("");
+    try {
+      const created = await createUser(userForm);
+      setUsers((current) => [...current, created].sort((a, b) => a.username.localeCompare(b.username)));
+      setUserForm({ username: "", email: "", mpin: "", role: "STAFF", department: "" });
+      setSuccess("User created successfully.");
+    } catch (err) {
+      const detail = err?.response?.data;
+      setError(detail?.detail || detail?.username?.[0] || detail?.mpin?.[0] || "Unable to create user.");
+    } finally {
+      setUserSaving(false);
+    }
+  };
+
+  const toggleUser = async (user) => {
+    if (disabled) return;
+    try {
+      const updated = await updateUser(user.id, { is_active: !user.is_active });
+      setUsers((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setSuccess(`${updated.username} ${updated.is_active ? "activated" : "deactivated"}.`);
+    } catch {
+      setError("Unable to update user.");
+    }
+  };
+
+  const handleBackup = async () => {
+    setBackupLoading(true);
+    setError("");
+    try {
+      const blob = await downloadDataBackup();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `nellore-die-cutting-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setSuccess("Backup downloaded successfully.");
+    } catch {
+      setError("Unable to download backup.");
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
   const topButtonLabel = editLocked ? "Settings Locked" : "Settings Unlocked";
   const bottomPrimaryLabel = editLocked ? "Settings Locked" : "Save Settings";
 
@@ -255,6 +335,104 @@ function SettingsPage() {
         or role actions are enabled without real server-side integrations and permissions.
       </p>
     </div>
+  );
+
+  const renderBillSettings = () => (
+    <>
+      <section className="settings-system-grid">
+        <article className="settings-card print-settings">
+          <h3>CREATE BILL & PRINT SETTINGS</h3>
+          <div className="settings-form-grid two-col">
+            <div className="settings-field">
+              <label>Default Payment Mode</label>
+              <select value={formData.default_payment_mode} onChange={(e) => updateField("default_payment_mode", e.target.value)} disabled={disabled}>
+                <option value="CASH">Cash</option>
+                <option value="ONLINE">Online</option>
+              </select>
+            </div>
+            <div className="settings-field">
+              <label>Bill Paper Size</label>
+              <select value={formData.bill_paper_size} onChange={(e) => updateField("bill_paper_size", e.target.value)} disabled={disabled}>
+                <option value="80MM">80mm Thermal</option>
+                <option value="58MM">58mm Thermal</option>
+              </select>
+            </div>
+            <div className="settings-field">
+              <label>Bill Prefix</label>
+              <input value={formData.bill_prefix} onChange={(e) => updateField("bill_prefix", e.target.value.toUpperCase())} maxLength="10" disabled={disabled} />
+            </div>
+            <div className="settings-field">
+              <label>Amount Decimal Places</label>
+              <select value={formData.amount_decimal_places} onChange={(e) => updateField("amount_decimal_places", Number(e.target.value))} disabled={disabled}>
+                <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+              </select>
+            </div>
+          </div>
+          {[
+            ["show_discount", "Show Discount", "Show the discount row while creating and printing bills."],
+            ["show_bill_header", "Print Bill Header", "Show shop name, address and phone on receipts."],
+            ["show_bill_footer", "Print Bill Footer", "Show the thank-you message on receipts."],
+            ["bill_print_sound", "Bill Print Sound", "Play the browser print sound preference after billing."],
+          ].map(([key, label, help]) => (
+            <div className="setting-row" key={key}>
+              <div><p>{label}</p><small>{help}</small></div>
+              <Toggle checked={Boolean(formData[key])} disabled={disabled} onChange={(next) => updateField(key, next)} />
+            </div>
+          ))}
+        </article>
+      </section>
+      {renderActions()}
+    </>
+  );
+
+  const renderUsers = () => (
+    <section className="settings-users-grid">
+      <article className="settings-card">
+        <h3><FaUserPlus /> ADD USER</h3>
+        <form className="settings-form-grid two-col" onSubmit={handleCreateUser}>
+          <div className="settings-field"><label>Username</label><input required value={userForm.username} onChange={(e) => setUserForm({ ...userForm, username: e.target.value })} disabled={disabled} /></div>
+          <div className="settings-field"><label>Email</label><input type="email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} disabled={disabled} /></div>
+          <div className="settings-field"><label>Staff MPIN</label><input required minLength="4" maxLength="6" inputMode="numeric" type="password" value={userForm.mpin} onChange={(e) => setUserForm({ ...userForm, mpin: e.target.value.replace(/\D/g, "").slice(0, 6) })} disabled={disabled} /></div>
+          <div className="settings-field"><label>Role</label><select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} disabled={disabled}><option value="STAFF">Staff</option><option value="ADMIN">Administrator</option></select></div>
+          <div className="settings-field"><label>Department</label><input value={userForm.department} onChange={(e) => setUserForm({ ...userForm, department: e.target.value })} disabled={disabled} /></div>
+          <button className="settings-primary-action" type="submit" disabled={disabled || userSaving}>{userSaving ? "Creating..." : "Create User"}</button>
+        </form>
+      </article>
+      <article className="settings-card">
+        <h3><FaUserShield /> USERS & ROLES</h3>
+        <div className="settings-user-list">
+          {users.map((user) => (
+            <div className="settings-user-row" key={user.id}>
+              <div><strong>{user.username}</strong><small>{user.email || "No email"} · {user.department || "General"}</small></div>
+              <span className={`settings-role-badge ${user.role === "ADMIN" ? "admin" : "staff"}`}>{user.role === "ADMIN" ? "Administrator" : "Staff"}</span>
+              <button type="button" className="settings-refresh-action" onClick={() => toggleUser(user)} disabled={disabled || user.id === JSON.parse(localStorage.getItem("user") || "null")?.id}>{user.is_active ? "Deactivate" : "Activate"}</button>
+            </div>
+          ))}
+          {users.length === 0 && <p className="settings-empty-note">No users found.</p>}
+        </div>
+      </article>
+    </section>
+  );
+
+  const renderBackup = () => (
+    <section className="settings-users-grid">
+      <article className="settings-card">
+        <h3><FaDatabase /> BACKUP & DATA</h3>
+        <p className="settings-card-description">Download a JSON backup containing customers, tokens, bills, die prices, bill items, and system settings.</p>
+        <button type="button" className="settings-primary-action" onClick={handleBackup} disabled={!canEdit || backupLoading}>
+          <FaDownload /> <span>{backupLoading ? "Preparing Backup..." : "Download Full Backup"}</span>
+        </button>
+        <div className="settings-backup-warning">Only administrators can create backups. Store the downloaded file securely.</div>
+      </article>
+      <article className="settings-card">
+        <h3>DATA SUMMARY</h3>
+        <div className="settings-data-summary">
+          {[["Customers", "customers"], ["Gold Tokens", "tokens"], ["Bills", "bills"], ["Bill Items", "bill_items"], ["Die Prices", "die_prices"]].map(([label, key]) => (
+            <div key={key}><span>{label}</span><strong>{dataSummary?.[key] ?? "—"}</strong></div>
+          ))}
+        </div>
+      </article>
+    </section>
   );
 
   const renderActions = () => (
@@ -1122,6 +1300,12 @@ function SettingsPage() {
 
             {renderActions()}
           </>
+        ) : activeTab === "bill" ? (
+          renderBillSettings()
+        ) : activeTab === "users" ? (
+          renderUsers()
+        ) : activeTab === "backup" ? (
+          renderBackup()
         ) : (
           renderPlaceholderTab()
         )}

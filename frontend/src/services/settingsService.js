@@ -10,6 +10,21 @@ export const getBusinessProfile = async () => {
   return response.data;
 };
 
+export const getBillingProfile = async () => {
+  const response = await api.get("/settings/billing-profile/");
+  return response.data;
+};
+
+export const getDataSummary = async () => {
+  const response = await api.get("/settings/data-summary/");
+  return response.data;
+};
+
+export const downloadDataBackup = async () => {
+  const response = await api.get("/settings/backup/", { responseType: "blob" });
+  return response.data;
+};
+
 // Staff-accessible weighing machine connection settings + the
 // admin-controlled manual weight entry lock. Used by Billing / Gold Return.
 export const getWeighingMachineConfig = async () => {

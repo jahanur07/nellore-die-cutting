@@ -1,7 +1,5 @@
 import { useState } from "react";
 import {
-  FaEye,
-  FaEyeSlash,
   FaHeadphones,
   FaLock,
   FaSignInAlt,
@@ -12,21 +10,25 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 
 import { setAuthToken } from "../../services/api";
-import { loginUser } from "../../services/authService";
+import { loginStaffWithMpin } from "../../services/authService";
 
 function StaffLogin() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [mpin, setMpin] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleLogin = async (event) => {
     event.preventDefault();
 
-    if (!username.trim() || !password) {
-      setError("Enter your staff username and password.");
+    if (!username.trim() || !mpin) {
+      setError("Enter your staff User ID and MPIN.");
+      return;
+    }
+
+    if (!/^\d{4,6}$/.test(mpin)) {
+      setError("MPIN must contain 4 to 6 digits.");
       return;
     }
 
@@ -34,7 +36,7 @@ function StaffLogin() {
     setError("");
 
     try {
-      const data = await loginUser(username.trim(), password);
+      const data = await loginStaffWithMpin(username.trim(), mpin);
 
       if (data?.user?.is_superuser) {
         setError("Administrators must sign in from the Admin Login page.");
@@ -48,7 +50,7 @@ function StaffLogin() {
       console.error("Staff login error:", loginError);
       setError(
         loginError.response?.status === 400
-          ? "Invalid staff username or password."
+          ? "Invalid staff User ID or MPIN."
           : "Unable to connect to the server."
       );
     } finally {
@@ -58,7 +60,7 @@ function StaffLogin() {
 
   const handleClear = () => {
     setUsername("");
-    setPassword("");
+    setMpin("");
     setError("");
   };
 
@@ -86,13 +88,10 @@ function StaffLogin() {
               <input id="staff-username" type="text" autoComplete="username" placeholder="Enter User ID" value={username} onChange={(event) => setUsername(event.target.value)} />
             </div>
 
-            <label htmlFor="staff-password">Password</label>
+            <label htmlFor="staff-mpin">MPIN</label>
             <div className="staff-login-input">
               <FaLock />
-              <input id="staff-password" type={showPassword ? "text" : "password"} autoComplete="current-password" placeholder="Enter Password" value={password} onChange={(event) => setPassword(event.target.value)} />
-              <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((visible) => !visible)}>
-                {showPassword ? <FaEyeSlash /> : <FaEye />}
-              </button>
+              <input id="staff-mpin" type="password" inputMode="numeric" autoComplete="one-time-code" maxLength="6" placeholder="Enter MPIN" value={mpin} onChange={(event) => setMpin(event.target.value.replace(/\D/g, "").slice(0, 6))} />
             </div>
 
             {error && <p className="staff-login-error" role="alert">{error}</p>}

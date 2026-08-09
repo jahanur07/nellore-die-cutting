@@ -3,8 +3,16 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.core.serializers import serialize
+from django.http import HttpResponse
+from django.utils import timezone
+import json
 
 from accounts.permissions import IsSuperuser
+from billing.models import Bill, BillItem
+from customers.models import Customer
+from masters.models import DiePrice
+from tokens.models import Token
 
 from .models import SystemSettings
 from .serializers import SystemSettingsSerializer
@@ -65,6 +73,59 @@ class BusinessProfileView(APIView):
 				"phone_number": settings_obj.phone_number,
 			}
 		)
+
+
+class BillingProfileView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request):
+		settings_obj = SystemSettings.get_solo()
+		return Response({
+			"shop_name": settings_obj.shop_name,
+			"address": settings_obj.address,
+			"phone_number": settings_obj.phone_number,
+			"bill_paper_size": settings_obj.bill_paper_size,
+			"show_bill_header": settings_obj.show_bill_header,
+			"show_bill_footer": settings_obj.show_bill_footer,
+			"show_discount": settings_obj.show_discount,
+			"bill_print_sound": settings_obj.bill_print_sound,
+			"currency": settings_obj.currency,
+			"amount_decimal_places": settings_obj.amount_decimal_places,
+		})
+
+
+class DataSummaryView(APIView):
+	permission_classes = [IsAuthenticated, IsSuperuser]
+
+	def get(self, request):
+		return Response({
+			"customers": Customer.objects.count(),
+			"tokens": Token.objects.count(),
+			"bills": Bill.objects.count(),
+			"bill_items": BillItem.objects.count(),
+			"die_prices": DiePrice.objects.count(),
+		})
+
+
+class DataBackupView(APIView):
+	permission_classes = [IsAuthenticated, IsSuperuser]
+
+	def get(self, request):
+		payload = {
+			"format": "nellore-die-cutting-backup-v1",
+			"created_at": timezone.now().isoformat(),
+			"data": {
+				"customers": serialize("json", Customer.objects.all()),
+				"tokens": serialize("json", Token.objects.all()),
+				"die_prices": serialize("json", DiePrice.objects.all()),
+				"bills": serialize("json", Bill.objects.all()),
+				"bill_items": serialize("json", BillItem.objects.all()),
+				"settings": serialize("json", SystemSettings.objects.all()),
+			},
+		}
+		response = HttpResponse(json.dumps(payload), content_type="application/json")
+		response["Content-Disposition"] = 'attachment; filename="nellore-die-cutting-backup.json"'
+		return response
 
 
 class WeighingMachineConfigView(APIView):

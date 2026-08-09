@@ -10,5 +10,8 @@ class StaffAccount(models.Model):
     # Optional department field (e.g. "Billing", "Counter")
     department = models.CharField(max_length=100, blank=True)
 
+    # Staff login PIN. Store only a one-way hash, never the plain MPIN.
+    mpin_hash = models.CharField(max_length=128, blank=True, default="")
+
     def __str__(self):
         return self.user.username

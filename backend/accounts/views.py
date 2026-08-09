@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.hashers import make_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.db import transaction
@@ -25,6 +26,8 @@ from .serializers import (
     LoginSerializer,
     PasswordResetConfirmSerializer,
     PasswordResetRequestSerializer,
+    ManagedUserCreateSerializer,
+    ManagedUserSerializer,
 )
 
 
@@ -162,6 +165,65 @@ class PasswordResetConfirmView(APIView):
         serializer.save()
 
         return Response({"detail": "Your password has been updated."})
+
+
+class ManagedUserListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _check_admin(self, request):
+        return request.user.is_superuser
+
+    def get(self, request):
+        if not self._check_admin(request):
+            return Response({"detail": "Administrator access is required."}, status=status.HTTP_403_FORBIDDEN)
+        users = get_user_model().objects.select_related("staff_account").order_by("username")
+        return Response(ManagedUserSerializer(users, many=True).data)
+
+    def post(self, request):
+        if not self._check_admin(request):
+            return Response({"detail": "Administrator access is required."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = ManagedUserCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        return Response(ManagedUserSerializer(user).data, status=status.HTTP_201_CREATED)
+
+
+class ManagedUserDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        if not request.user.is_superuser:
+            return Response({"detail": "Administrator access is required."}, status=status.HTTP_403_FORBIDDEN)
+        user_model = get_user_model()
+        try:
+            user = user_model.objects.select_related("staff_account").get(pk=pk)
+        except user_model.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if "email" in request.data:
+            user.email = request.data["email"]
+        if "is_active" in request.data:
+            user.is_active = bool(request.data["is_active"])
+        if "role" in request.data:
+            role = str(request.data["role"]).upper()
+            if role not in {"ADMIN", "STAFF"}:
+                return Response({"detail": "Role must be ADMIN or STAFF."}, status=status.HTTP_400_BAD_REQUEST)
+            user.is_staff = role == "ADMIN"
+            user.is_superuser = role == "ADMIN"
+        user.save()
+
+        staff, _ = StaffAccount.objects.get_or_create(user=user)
+        if "department" in request.data:
+            staff.department = str(request.data["department"])[:100]
+            staff.save(update_fields=["department"])
+        if "mpin" in request.data:
+            mpin = str(request.data["mpin"])
+            if not mpin.isdigit() or len(mpin) not in (4, 5, 6):
+                return Response({"detail": "MPIN must contain 4 to 6 digits."}, status=status.HTTP_400_BAD_REQUEST)
+            staff.mpin_hash = make_password(mpin)
+            staff.save(update_fields=["mpin_hash"])
+
+        return Response(ManagedUserSerializer(user).data)
         
 class DashboardView(APIView):
 

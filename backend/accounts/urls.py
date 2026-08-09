@@ -7,6 +7,8 @@ from .views import (
     DashboardView,
     PasswordResetConfirmView,
     PasswordResetRequestView,
+    ManagedUserListCreateView,
+    ManagedUserDetailView,
 )
 
 
@@ -37,6 +39,8 @@ urlpatterns = [
         PasswordResetConfirmView.as_view(),
         name="password-reset-confirm",
     ),
+    path("users/", ManagedUserListCreateView.as_view(), name="managed-user-list-create"),
+    path("users/<int:pk>/", ManagedUserDetailView.as_view(), name="managed-user-detail"),
 
     # GET /api/auth/dashboard/ — today's business summary (login required)
     path(

@@ -24,7 +24,7 @@ import useWeighingMachine from "../../hooks/useWeighingMachine";
 import { createBill } from "../../services/billingService";
 import { getCustomerByMobile } from "../../services/customerService";
 import { getDiePrices } from "../../services/masterService";
-import { getWeighingMachineConfig } from "../../services/settingsService";
+import { getBillingProfile, getWeighingMachineConfig } from "../../services/settingsService";
 import { getCustomerTokens, getTokenByNumber } from "../../services/tokenService";
 
 const money = (value) => Number.parseFloat(value || 0);
@@ -86,6 +86,15 @@ function BillingPage() {
   const [weightMode, setWeightMode] = useState(() => localStorage.getItem("preferredWeightMode") || "machine");
   const [manualWeightAllowed, setManualWeightAllowed] = useState(false);
   const [machineConfig, setMachineConfig] = useState({ weighing_machine_enabled: false });
+  const [printConfig, setPrintConfig] = useState({
+    shop_name: "NELLORE DIE CUTTING",
+    address: "13/5/32/1, Ground Floor\nVemugunta Vari Veedhi\nNellore - 524001",
+    phone_number: "8074771338",
+    bill_paper_size: "80MM",
+    show_bill_header: true,
+    show_bill_footer: true,
+    show_discount: true,
+  });
 
   const [discountAmount, setDiscountAmount] = useState("0.00");
   const [paymentMode, setPaymentMode] = useState("cash");
@@ -114,6 +123,14 @@ function BillingPage() {
     };
 
     loadDies();
+  }, []);
+
+  useEffect(() => {
+    getBillingProfile()
+      .then((config) => setPrintConfig((current) => ({ ...current, ...(config || {}) })))
+      .catch(() => {
+        // Keep safe receipt defaults if the optional business profile cannot be loaded.
+      });
   }, []);
 
   useEffect(() => {
@@ -230,7 +247,7 @@ function BillingPage() {
     [billItems]
   );
 
-  const parsedDiscount = Math.max(0, money(discountAmount));
+  const parsedDiscount = printConfig.show_discount ? Math.max(0, money(discountAmount)) : 0;
   const finalAmount = Math.max(totalAmount - parsedDiscount, 0);
 
   const now = new Date();
@@ -435,83 +452,90 @@ function BillingPage() {
     setBillItems((current) => current.filter((item) => item.local_id !== localId));
   };
 
-  const printBill = (bill) => {
+  const printBill = (bill, printWindow) => {
+    const createdAt = new Date(bill.created_at);
+    const address = String(printConfig.address || "").replace(/\r?\n/g, "<br />");
+    const paperSize = printConfig.bill_paper_size === "58MM" ? "58mm" : "80mm";
     const rows = (bill.items || [])
       .map(
         (item) => `
           <tr>
             <td>${item.die_code || ""}</td>
-            <td>${item.work_name || ""}</td>
-            <td style="text-align:center;">${item.quantity}</td>
-            <td style="text-align:right;">${Number(item.rate || 0).toFixed(2)}</td>
-            <td style="text-align:right;">${Number(item.amount || 0).toFixed(2)}</td>
-          </tr>
-        `
+            <td>${item.quantity || 0}</td>
+            <td>${Number(item.rate || 0).toFixed(2)}</td>
+            <td>${Number(item.amount || 0).toFixed(2)}</td>
+          </tr>`
       )
       .join("");
 
-    const printWindow = window.open("", "_blank", "width=900,height=700");
-    if (!printWindow) return;
+    if (!printWindow || printWindow.closed) return;
 
-    printWindow.document.write(`
+    printWindow.document.open();
+    printWindow.document.write(`<!DOCTYPE html>
       <html>
         <head>
-          <title>${bill.bill_number}</title>
+          <meta charset="UTF-8" />
+          <title>${bill.bill_number || "Bill"}</title>
           <style>
-            body { font-family: Arial, sans-serif; margin: 24px; color: #222; }
-            h1 { margin: 0; font-size: 24px; }
-            h2 { margin: 0; font-size: 14px; font-weight: normal; color: #555; }
-            .head { margin-bottom: 16px; }
-            .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
-            table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-            th, td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
-            th { background: #f3f3f3; text-align: left; }
-            .summary { margin-top: 16px; display: grid; gap: 6px; }
-            .bold { font-weight: 700; }
+            @page { size: ${paperSize} auto; margin: 3mm; }
+            * { box-sizing: border-box; font-family: Arial, sans-serif; }
+            body { margin: 0; background: #fff; color: #000; }
+            .receipt { width: 72mm; margin: auto; padding: 8px; }
+            .shop-name, .bill-title, .footer { text-align: center; }
+            .shop-name { font-size: 22px; font-weight: bold; }
+            .shop-address { text-align: center; font-size: 12px; line-height: 1.5; margin-top: 6px; }
+            .separator { border-top: 2px dashed #000; margin: 10px 0; }
+            .bill-title { font-size: 20px; font-weight: bold; margin: 10px 0; }
+            .info, .items { width: 100%; border-collapse: collapse; }
+            .info td { padding: 3px 0; font-size: 13px; }
+            .items { margin-top: 10px; }
+            .items th, .items td { border: 1px solid #000; padding: 5px; font-size: 12px; text-align: center; }
+            .total { margin-top: 12px; font-size: 14px; }
+            .line { display: flex; justify-content: space-between; margin-top: 6px; }
+            .final-box { border: 2px solid #000; margin-top: 12px; padding: 10px; text-align: center; }
+            .final-label { font-size: 16px; font-weight: bold; }
+            .final-value { font-size: 30px; font-weight: bold; }
+            .footer { margin-top: 15px; font-size: 13px; }
           </style>
         </head>
         <body>
-          <div class="head">
-            <h1>NELLORE DIE CUTTING</h1>
-            <h2>Jewellery Die Cutting</h2>
+          <div class="receipt">
+            ${printConfig.show_bill_header ? `<div class="shop-name">${printConfig.shop_name || "NELLORE DIE CUTTING"}</div>
+            <div class="shop-address">${address}<br />Contact: ${printConfig.phone_number || ""}</div>` : ""}
+            <div class="separator"></div>
+            <div class="bill-title">★ BILL ★</div>
+            <div class="separator"></div>
+            <table class="info">
+              <tr><td><b>Bill No</b></td><td>:</td><td>${bill.bill_number || ""}</td></tr>
+              <tr><td><b>Date</b></td><td>:</td><td>${createdAt.toLocaleDateString("en-IN")}</td></tr>
+              <tr><td><b>Time</b></td><td>:</td><td>${createdAt.toLocaleTimeString("en-IN")}</td></tr>
+              <tr><td><b>Mobile</b></td><td>:</td><td>${bill.customer_mobile || ""}</td></tr>
+              <tr><td><b>Token No</b></td><td>:</td><td>${bill.token_number || ""}</td></tr>
+              <tr><td><b>Payment</b></td><td>:</td><td>${bill.payment_method || ""}</td></tr>
+              <tr><td><b>Gold Return</b></td><td>:</td><td><b>${Number(bill.gold_return || 0).toFixed(3)} gm</b></td></tr>
+            </table>
+            <div class="separator"></div>
+            <table class="items">
+              <thead><tr><th>Die</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+            <div class="total">
+              <div class="line"><span>Total Amount</span><b>₹ ${Number(bill.total_amount || 0).toFixed(2)}</b></div>
+              ${printConfig.show_discount ? `<div class="line"><span>Discount</span><b>₹ ${Number(bill.discount || 0).toFixed(2)}</b></div>` : ""}
+            </div>
+            <div class="final-box">
+              <div class="final-label">FINAL AMOUNT</div>
+              <div class="final-value">₹ ${Number(bill.final_amount || 0).toFixed(2)}</div>
+            </div>
+            ${printConfig.show_bill_footer ? `<div class="separator"></div><div class="footer">Thank You! Visit Again.<br />Please keep this bill safely.</div>` : ""}
           </div>
-
-          <div class="meta">
-            <div><span class="bold">Bill Number:</span> ${bill.bill_number || ""}</div>
-            <div><span class="bold">Date:</span> ${new Date(bill.created_at).toLocaleDateString()}</div>
-            <div><span class="bold">Time:</span> ${new Date(bill.created_at).toLocaleTimeString()}</div>
-            <div><span class="bold">Payment:</span> ${bill.payment_method || ""}</div>
-            <div><span class="bold">Customer:</span> ${bill.customer_name || ""}</div>
-            <div><span class="bold">Mobile:</span> ${bill.customer_mobile || ""}</div>
-            <div><span class="bold">Token:</span> ${bill.token_number || ""}</div>
-            <div><span class="bold">Gold Deposit:</span> ${Number(bill.gold_deposit || 0).toFixed(3)} gm</div>
-            <div><span class="bold">Gold Return:</span> ${Number(bill.gold_return || 0).toFixed(3)} gm</div>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th>Die No</th>
-                <th>Work Name</th>
-                <th>Qty</th>
-                <th>Rate</th>
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-
-          <div class="summary">
-            <div><span class="bold">Total Amount:</span> ${Number(bill.total_amount || 0).toFixed(2)}</div>
-            <div><span class="bold">Discount:</span> ${Number(bill.discount || 0).toFixed(2)}</div>
-            <div><span class="bold">Final Amount:</span> ${Number(bill.final_amount || 0).toFixed(2)}</div>
-          </div>
-
-          <script>window.onload = function(){ window.print(); };</script>
         </body>
-      </html>
-    `);
-
+      </html>`);
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+      setTimeout(() => printWindow.close(), 500);
+    };
     printWindow.document.close();
   };
 
@@ -574,11 +598,24 @@ function BillingPage() {
 
     if (goldReturn > money(selectedToken.remaining_gold)) {
       setError(
-        `Gold return cannot exceed remaining gold (${money(selectedToken.remaining_gold).toFixed(3)} gm).`
+        `Gold return cannot exceed remaining gold(${ money(selectedToken.remaining_gold).toFixed(3)
+  } gm).`
       );
       setErrorType("error");
       return;
     }
+
+    // Open the print window while still inside the button click event.
+    // Browsers may block a new window opened after the API request resolves.
+    const printWindow = window.open("", "_blank", "width=420,height=900");
+
+    if (!printWindow) {
+      setError("Printing was blocked by the browser. Please allow pop-ups and try again.");
+      setErrorType("error");
+      return;
+    }
+
+    printWindow.document.write("<p style='font-family: Arial'>Creating bill...</p>");
 
     setSaving(true);
 
@@ -598,10 +635,11 @@ function BillingPage() {
 
       const bill = await createBill(payload);
       setCreatedBill(bill);
-      setMessage(`Bill created successfully: ${bill.bill_number}`);
+      setMessage(`Bill created successfully: ${ bill.bill_number } `);
       setMessageType("success");
-      printBill(bill);
+      printBill(bill, printWindow);
     } catch (err) {
+      if (!printWindow.closed) printWindow.close();
       setError(formatError(err));
       setErrorType("error");
     } finally {
@@ -673,8 +711,8 @@ function BillingPage() {
             </div>
           </div>
 
-          {message && <div className={`alert alert-${messageType}`}>{message}</div>}
-          {error && <div className={`alert alert-${errorType}`}>{error}</div>}
+          {message && <div className={`alert alert - ${ messageType } `}>{message}</div>}
+          {error && <div className={`alert alert - ${ errorType } `}>{error}</div>}
 
           <div className="billing-top-input-grid">
             <div className="billing-section billing-card">
@@ -697,7 +735,7 @@ function BillingPage() {
               </div>
 
               {customerMessage && (
-                <div className={`billing-message billing-message-${customerMessageType}`}>
+                <div className={`billing - message billing - message - ${ customerMessageType } `}>
                   {customerMessageType === "success" && <FaCheck />}
                   {customerMessage}
                 </div>
@@ -735,7 +773,7 @@ function BillingPage() {
               </div>
 
               {tokenMessage && (
-                <div className={`billing-message billing-message-${tokenMessageType}`}>
+                <div className={`billing - message billing - message - ${ tokenMessageType } `}>
                   {tokenMessageType === "success" && <FaCheck />}
                   {tokenMessage}
                 </div>
@@ -781,7 +819,7 @@ function BillingPage() {
                     <button
                       key={category.key}
                       type="button"
-                      className={`billing-filter-pill ${selectedDieCategory === category.key ? "active" : ""}`}
+                      className={`billing - filter - pill ${ selectedDieCategory === category.key ? "active" : "" } `}
                       onClick={() => setSelectedDieCategory(category.key)}
                     >
                       {category.label}
@@ -795,10 +833,10 @@ function BillingPage() {
                     return (
                       <button
                         key={die.id}
-                        className={`billing-die-button ${inBill ? "selected" : ""}`}
+                        className={`billing - die - button ${ inBill ? "selected" : "" } `}
                         style={{ backgroundColor: getDieColor(die, index) }}
                         onClick={() => addBillItem(die)}
-                        title={`${die.die_code} - ${die.name} - ${die.rate}`}
+                        title={`${ die.die_code } - ${ die.name } - ${ die.rate } `}
                       >
                         <div className="die-label">{die.die_code}</div>
                         <div className="die-price">Rs {Number(die.rate).toFixed(2)}</div>
@@ -819,7 +857,7 @@ function BillingPage() {
                 <div className="billing-section-header">
                   <label className="billing-section-label">GOLD RETURN (WEIGHT)</label>
 
-                  <div className={`weight-lock-pill ${weightMode === "manual" ? "unlocked" : "locked"}`}>
+                  <div className={`weight - lock - pill ${ weightMode === "manual" ? "unlocked" : "locked" } `}>
                     {weightMode === "manual" ? <FaLockOpen /> : <FaLock />}
                     <span>
                       {weightMode === "manual"
@@ -841,7 +879,7 @@ function BillingPage() {
                         {money(weightMode === "manual" ? manualWeight : goldReturnWeight).toFixed(3)}
                         <span>gm</span>
                       </div>
-                      <div className={`gold-weight-status ${weightMode === "manual" ? "manual" : "success"}`}>
+                      <div className={`gold - weight - status ${ weightMode === "manual" ? "manual" : "success" } `}>
                         {weightMode === "manual"
                           ? "Manual Weight Applied"
                           : machineStableWeight !== null
@@ -865,7 +903,7 @@ function BillingPage() {
                               ? "Machine Not Connected"
                               : "Automatic Capture Disabled"}
                       </span>
-                      <div className={`capture-dot ${weightMode === "manual" || machineConnected ? "active" : ""}`}></div>
+                      <div className={`capture - dot ${ weightMode === "manual" || machineConnected ? "active" : "" } `}></div>
                     </div>
 
                     {machineConfig.weighing_machine_enabled && weightMode === "machine" && (
@@ -1041,16 +1079,18 @@ function BillingPage() {
                     <strong>{totalAmount.toFixed(2)}</strong>
                   </div>
 
-                  <div className="billing-summary-row billing-summary-row-input">
-                    <span>Discount (Rs)</span>
-                    <input
-                      type="number"
-                      value={discountAmount}
-                      onChange={(e) => setDiscountAmount(e.target.value)}
-                      step="0.01"
-                      min="0"
-                    />
-                  </div>
+                  {printConfig.show_discount && (
+                    <div className="billing-summary-row billing-summary-row-input">
+                      <span>Discount (Rs)</span>
+                      <input
+                        type="number"
+                        value={discountAmount}
+                        onChange={(e) => setDiscountAmount(e.target.value)}
+                        step="0.01"
+                        min="0"
+                      />
+                    </div>
+                  )}
 
                   <div className="billing-summary-row billing-summary-total">
                     <span>Final Amount (Rs)</span>
@@ -1064,14 +1104,14 @@ function BillingPage() {
                 <div className="payment-options">
                   <button
                     type="button"
-                    className={`payment-btn ${paymentMode === "cash" ? "active" : ""}`}
+                    className={`payment - btn ${ paymentMode === "cash" ? "active" : "" } `}
                     onClick={() => setPaymentMode("cash")}
                   >
                     Cash
                   </button>
                   <button
                     type="button"
-                    className={`payment-btn ${paymentMode === "online" ? "active" : ""}`}
+                    className={`payment - btn ${ paymentMode === "online" ? "active" : "" } `}
                     onClick={() => setPaymentMode("online")}
                   >
                     Online

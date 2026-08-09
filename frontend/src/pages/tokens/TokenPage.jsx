@@ -7,14 +7,12 @@ import {
   FaInfo,
   FaLock,
   FaLockOpen,
-  FaMapMarkerAlt,
   FaPencilAlt,
   FaPhoneAlt,
   FaPlug,
   FaPrint,
   FaSync,
-  FaTag,
-  FaUser,
+  FaTag, 
   FaWeight,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
@@ -41,9 +39,7 @@ function TokenPage() {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    customer_name: "",
     customer_mobile: "",
-    customer_address: "",
     gold_weight: "",
     remarks: "",
   });
@@ -209,9 +205,7 @@ function TokenPage() {
 
   const clearTokenForm = () => {
     setFormData({
-      customer_name: "",
       customer_mobile: "",
-      customer_address: "",
       gold_weight: "",
       remarks: "",
     });
@@ -233,8 +227,7 @@ function TokenPage() {
       return false;
     }
 
-    const createdAt = token.created_at ? new Date(token.created_at) : new Date();
-    const customerName = escapePrintText(token.customer_name || "");
+    const createdAt = token.created_at ? new Date(token.created_at) : new Date(); 
     const customerCode = escapePrintText(token.customer_code || "");
     const remarks = escapePrintText(token.remarks || "-");
     const shopName = escapePrintText(profile?.shop_name || DEFAULT_BUSINESS_PROFILE.shop_name);
@@ -248,43 +241,233 @@ function TokenPage() {
         <head>
           <title>${escapePrintText(token.token_number)}</title>
           <style>
-            * { box-sizing: border-box; }
-            body { margin: 0; padding: 22px; color: #182418; font-family: Arial, sans-serif; }
-            .receipt { max-width: 360px; margin: 0 auto; border: 1px solid #ccd4ca; padding: 20px; }
-            .brand { padding-bottom: 14px; border-bottom: 1px dashed #7f8b7c; text-align: center; }
-            .brand h1 { margin: 0; color: #1f4c20; font-size: 21px; letter-spacing: 1px; }
-            .brand p { margin: 5px 0 0; color: #5b6659; font-size: 12px; }
-            .title { margin: 16px 0; color: #1f4c20; font-size: 15px; font-weight: 700; text-align: center; }
-            .details { display: grid; gap: 9px; }
-            .row { display: grid; grid-template-columns: 1fr auto; gap: 12px; font-size: 13px; }
-            .label { color: #61705e; }
-            .value { color: #172317; font-weight: 700; text-align: right; word-break: break-word; }
-            .weight { margin: 18px 0; padding: 15px; border: 1px solid #bfd5bb; background: #f1f8ef; text-align: center; }
-            .weight span { display: block; color: #52664e; font-size: 11px; letter-spacing: 1px; }
-            .weight strong { display: block; margin-top: 6px; color: #1f4c20; font-size: 27px; }
-            .remarks { padding-top: 13px; border-top: 1px dashed #7f8b7c; color: #536150; font-size: 12px; line-height: 1.5; }
-            .footer { margin-top: 19px; color: #657062; font-size: 11px; text-align: center; }
-            @media print { body { padding: 0; } .receipt { border: 0; } }
+          @page {
+              size: 80mm auto;
+              margin: 3mm;
+          }
+          *{
+              margin:0;
+              padding:0;
+              box-sizing:border-box;
+              font-family:Arial, Helvetica, sans-serif;
+          }
+
+          body{
+              background:white;
+              color:black;
+              padding:18px;
+          }
+
+          .receipt{
+                width:72mm;
+                margin:0 auto;
+            }
+
+          .shop-name{
+              text-align:center;
+              font-size:28px;
+              font-weight:900;
+              letter-spacing:2px;
+              margin-bottom:10px;
+          }
+
+          .shop-address{
+              text-align:center;
+              font-size:16px;
+              line-height:1.45;
+          }
+
+          .separator{
+              border-top:2px dashed #000;
+              margin:18px 0;
+          }
+
+          .token-title{
+              text-align:center;
+              font-size:22px;
+              font-weight:bold;
+              margin:12px 0;
+          }
+
+          .info-table{
+              width:100%;
+              border-collapse:collapse;
+          }
+
+          .info-table td{
+              padding:8px 0;
+              font-size:19px;
+          }
+
+          .info-label{
+              width:42%;
+          }
+
+          .info-colon{
+              width:8%;
+              text-align:center;
+          }
+
+          .info-value{
+              font-weight:bold;
+          }
+
+          .gold-box{
+              border:2px solid #000;
+              border-radius:12px;
+              padding:18px;
+              margin:20px 0;
+              text-align:center;
+          }
+
+          .gold-title{
+              font-size:21px;
+              font-weight:bold;
+              margin-bottom:10px;
+          }
+
+          .gold-value{
+              font-size:62px;
+              font-weight:bold;
+          }
+
+          .gold-unit{
+              font-size:28px;
+          }
+
+          .remarks-heading{
+              font-size:20px;
+              font-weight:bold;
+              margin-bottom:10px;
+          }
+
+          .remark-line{
+              border-bottom:2px solid #000;
+              height:34px;
+              margin-bottom:16px;
+          }
+
+          .footer{
+              margin-top:20px;
+              text-align:center;
+              font-size:18px;
+              line-height:1.6;
+          }
+
+          .thank-you{
+              margin-top:20px;
+              text-align:center;
+              font-size:26px;
+              font-weight:bold;
+              letter-spacing:2px;
+          }
+
+          @media print{
+
+          body{
+              padding:0;
+          }
+
+          .receipt{
+              width:100%;
+          }
+
+          }
+
           </style>
         </head>
         <body>
           <section class="receipt">
-            <header class="brand">
-              <h1>${shopName}</h1>
-              <p>Address: ${shopAddress}</p>
-              <p>Shop Mobile: ${shopPhone}</p>
-            </header>
-            <h2 class="title">GOLD DEPOSIT TOKEN</h2>
-            <div class="details">
-              <div class="row"><span class="label">Token No.</span><span class="value">${escapePrintText(token.token_number)}</span></div>
-              <div class="row"><span class="label">Date</span><span class="value">${createdAt.toLocaleDateString("en-IN")}</span></div>
-              <div class="row"><span class="label">Time</span><span class="value">${createdAt.toLocaleTimeString("en-IN")}</span></div>
-              <div class="row"><span class="label">Customer ID</span><span class="value">${customerCode || "-"}</span></div>
-              <div class="row"><span class="label">Customer</span><span class="value">${customerName || "-"}</span></div>
-            </div>
-            <div class="weight"><span>GOLD DEPOSIT</span><strong>${Number(token.gold_weight || 0).toFixed(3)} gm</strong></div>
-            <div class="remarks"><strong>Remarks:</strong> ${remarks}</div>
-            <footer class="footer">Please keep this token safely for billing.</footer>
+
+              <div class="shop-name">
+                  ${shopName}
+              </div>
+
+              <div class="shop-address">
+                  ${shopAddress}<br>
+                  Phone : ${shopPhone}
+              </div>
+
+              <div class="separator"></div>
+
+              <div class="token-title">
+                  ★ GOLD DEPOSIT TOKEN ★
+              </div>
+
+              <div class="separator"></div>
+
+              <table class="info-table">
+
+                  <tr>
+                      <td class="info-label">Token No</td>
+                      <td class="info-colon">:</td>
+                      <td class="info-value">${escapePrintText(token.token_number)}</td>
+                  </tr>
+
+                  <tr>
+                      <td class="info-label">Date</td>
+                      <td class="info-colon">:</td>
+                      <td class="info-value">
+                          ${createdAt.toLocaleDateString("en-IN")}
+                      </td>
+                  </tr>
+
+                  <tr>
+                      <td class="info-label">Time</td>
+                      <td class="info-colon">:</td>
+                      <td class="info-value">
+                          ${createdAt.toLocaleTimeString("en-IN")}
+                      </td>
+                  </tr>
+
+                  <tr>
+                      <td class="info-label">Mobile</td>
+                      <td class="info-colon">:</td>
+                      <td class="info-value">
+                          ${token.customer_mobile}
+                      </td>
+                  </tr>
+
+              </table>
+
+              <div class="separator"></div>
+
+              <div class="gold-box">
+
+                  <div class="gold-title">
+                      GOLD DEPOSIT
+                  </div>
+
+                  <div class="gold-value">
+                      ${Number(token.gold_weight || 0).toFixed(3)}
+                      <span class="gold-unit">gm</span>
+                  </div>
+
+              </div>
+
+              <div class="separator"></div>
+
+              <div class="remarks-heading">
+                  Remarks :
+              </div>
+
+              <div class="remark-line">
+                  ${remarks === "-" ? "" : remarks}
+              </div>
+
+              <div class="remark-line"></div>
+
+              <div class="separator"></div>
+
+              <div class="footer">
+                  Please keep this token safely.<br>
+                  Required during billing.
+              </div>
+
+              <div class="thank-you">
+                  *** THANK YOU ***
+              </div>
+
           </section>
           <script>window.onload = function(){ window.print(); };</script>
         </body>
@@ -325,12 +508,6 @@ function TokenPage() {
     e.preventDefault();
     setMessage("");
     setError("");
-
-    if (formData.customer_name.trim().length < 2) {
-      setError("Please enter a valid customer name.");
-      setErrorType("error");
-      return;
-    }
 
     if (!/^\d{10}$/.test(formData.customer_mobile)) {
       setError("Mobile number must contain exactly 10 digits.");
@@ -378,11 +555,9 @@ function TokenPage() {
       const profileRequest = getBusinessProfile().catch(() => businessProfile);
       const [newToken, profile] = await Promise.all([
         createToken({
-          customer_name: formData.customer_name.trim(),
-          customer_mobile: formData.customer_mobile,
-          customer_address: formData.customer_address.trim(),
-          gold_weight: finalWeight,
-          remarks: formData.remarks.trim(),
+            customer_mobile: formData.customer_mobile,
+            gold_weight: finalWeight,
+            remarks: formData.remarks.trim(),
         }),
         profileRequest,
       ]);
@@ -503,41 +678,50 @@ function TokenPage() {
           {/* CUSTOMER DETAILS */}
           <div className="token-form-section">
             <label className="section-label">CUSTOMER DETAILS</label>
-            <div className="token-customer-grid">
-              <div className="customer-input-wrapper">
-                <FaUser className="customer-input-icon" />
-                <input
-                  type="text"
-                  name="customer_name"
-                  placeholder="Enter customer name"
-                  value={formData.customer_name}
+
+            <div className="customer-details-grid">
+
+              {/* Mobile Number */}
+              <div className="customer-field">
+                <label className="field-label">
+                  Mobile Number
+                </label>
+
+                <div className="customer-input-wrapper">
+                  <FaPhoneAlt className="customer-input-icon" />
+
+                  <input
+                    type="tel"
+                    name="customer_mobile"
+                    placeholder="Enter 10-digit mobile number"
+                    value={formData.customer_mobile}
+                    onChange={handleChange}
+                    maxLength={10}
+                  />
+                </div>
+              </div>
+
+              {/* Remarks */}
+              <div className="customer-field">
+                <label className="field-label">
+                  Remarks
+                  <span> (Optional)</span>
+                </label>
+
+                <textarea
+                  name="remarks"
+                  placeholder="Example: Old customer • Urgent order • Repair work • Special instructions..."
+                  value={formData.remarks}
                   onChange={handleChange}
+                  rows={3}
+                  className="token-remarks-input"
                 />
               </div>
-              <div className="customer-input-wrapper">
-                <FaPhoneAlt className="customer-input-icon" />
-                <input
-                  type="tel"
-                  name="customer_mobile"
-                  placeholder="Enter 10-digit mobile number"
-                  value={formData.customer_mobile}
-                  onChange={handleChange}
-                  maxLength="10"
-                />
-              </div>
-              <div className="customer-input-wrapper token-customer-address-input">
-                <FaMapMarkerAlt className="customer-input-icon" />
-                <input
-                  type="text"
-                  name="customer_address"
-                  placeholder="Enter customer address (optional)"
-                  value={formData.customer_address}
-                  onChange={handleChange}
-                />
-              </div>
+
             </div>
+
             <p className="token-customer-note">
-              A new customer is added automatically when this mobile number is not registered. Existing mobile numbers are linked to their current customer record.
+              Customer will be created automatically if this mobile number is not already registered.
             </p>
           </div>
 
@@ -726,7 +910,7 @@ function TokenPage() {
               {tokens.map((token) => (
                 <div key={token.id} className="recent-item">
                   <span className="recent-token-no">{token.token_number}</span>
-                  <span className="recent-customer">{token.customer_name || "N/A"}</span>
+                  <span className="recent-customer">{token.customer_mobile}</span>
                   <span className="recent-weight">{Number(token.gold_weight).toFixed(3)} gm</span>
                 </div>
               ))}

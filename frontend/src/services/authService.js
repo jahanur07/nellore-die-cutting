@@ -11,6 +11,14 @@ export const loginUser = async (username, password) => {
   return response.data;
 };
 
+export const loginStaffWithMpin = async (userId, mpin) => {
+  const response = await api.post("/auth/login/", {
+    username: userId,
+    mpin,
+  });
+  return response.data;
+};
+
 export const getAdminSetupStatus = async () => {
   const response = await api.get("/auth/admin-setup/");
   return response.data;
