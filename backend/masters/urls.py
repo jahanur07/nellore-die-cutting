@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     DiePriceListCreateView,
     DiePriceDetailView,
+    DiePriceExcelImportView,
 )
 
 
@@ -17,6 +18,7 @@ urlpatterns = [
         DiePriceListCreateView.as_view(),
         name="die-price-list-create",
     ),
+    path("die-prices/import/", DiePriceExcelImportView.as_view(), name="die-price-import"),
 
     # GET/PATCH/DELETE /api/masters/die-prices/<id>/ — view, update, or delete
     path(

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   FaHeadphones,
-  FaLock,
+  FaShieldAlt,
   FaSignInAlt,
   FaSyncAlt,
   FaUser,
@@ -16,6 +16,7 @@ function StaffLogin() {
   const navigate = useNavigate();
   const [username, setUsername] = useState("");
   const [mpin, setMpin] = useState("");
+  const mpinInputRefs = useRef([]);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,8 +28,8 @@ function StaffLogin() {
       return;
     }
 
-    if (!/^\d{4,6}$/.test(mpin)) {
-      setError("MPIN must contain 4 to 6 digits.");
+    if (!/^\d{4}$/.test(mpin)) {
+      setError("MPIN must contain exactly 4 digits.");
       return;
     }
 
@@ -64,6 +65,30 @@ function StaffLogin() {
     setError("");
   };
 
+  const handleMpinChange = (index, value) => {
+    const digit = value.replace(/\D/g, "").slice(-1);
+    const next = mpin.padEnd(4, "").split("");
+    next[index] = digit;
+    const nextMpin = next.join("").replace(/\s/g, "");
+    setMpin(nextMpin);
+    if (digit && index < 3) {
+      mpinInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleMpinKeyDown = (index, event) => {
+    if (event.key === "Backspace" && !mpin[index] && index > 0) {
+      mpinInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleMpinPaste = (event) => {
+    event.preventDefault();
+    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 4);
+    setMpin(pasted);
+    mpinInputRefs.current[Math.min(pasted.length, 3)]?.focus();
+  };
+
   return (
     <main className="staff-login-page">
       <section className="staff-login-shell" aria-label="Nellore Die Cutting staff login">
@@ -88,10 +113,29 @@ function StaffLogin() {
               <input id="staff-username" type="text" autoComplete="username" placeholder="Enter User ID" value={username} onChange={(event) => setUsername(event.target.value)} />
             </div>
 
-            <label htmlFor="staff-mpin">MPIN</label>
-            <div className="staff-login-input">
-              <FaLock />
-              <input id="staff-mpin" type="password" inputMode="numeric" autoComplete="one-time-code" maxLength="6" placeholder="Enter MPIN" value={mpin} onChange={(event) => setMpin(event.target.value.replace(/\D/g, "").slice(0, 6))} />
+            <label className="staff-mpin-label" htmlFor="staff-mpin-0">mPIN</label>
+            <div className="staff-mpin-entry" role="group" aria-label="Enter your staff MPIN">
+              {Array.from({ length: 4 }, (_, index) => (
+                <input
+                  key={index}
+                  ref={(element) => { mpinInputRefs.current[index] = element; }}
+                  id={`staff-mpin-${index}`}
+                  className="staff-mpin-digit"
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete={index === 0 ? "one-time-code" : "off"}
+                  maxLength="1"
+                  value={mpin[index] || ""}
+                  onChange={(event) => handleMpinChange(index, event.target.value)}
+                  onKeyDown={(event) => handleMpinKeyDown(index, event)}
+                  onPaste={index === 0 ? handleMpinPaste : undefined}
+                  aria-label={`MPIN digit ${index + 1}`}
+                />
+              ))}
+            </div>
+            <div className="staff-mpin-hint">
+              <FaShieldAlt />
+              <span>Enter your 4-digit MPIN to continue</span>
             </div>
 
             {error && <p className="staff-login-error" role="alert">{error}</p>}

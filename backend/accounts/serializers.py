@@ -29,14 +29,14 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Enter your password or MPIN.")
 
         if mpin:
-            if not mpin.isdigit() or len(mpin) not in (4, 5, 6):
-                raise serializers.ValidationError("MPIN must contain 4 to 6 digits.")
+            if not mpin.isdigit() or len(mpin) != 4:
+                raise serializers.ValidationError("MPIN must contain exactly 4 digits.")
 
             user = get_user_model().objects.filter(
                 username=username,
                 is_active=True,
-            ).select_related("staff_account").first()
-            staff_account = getattr(user, "staff_account", None) if user else None
+            ).select_related("staffaccount").first()
+            staff_account = getattr(user, "staffaccount", None) if user else None
             if not user or user.is_superuser or not staff_account or not check_password(mpin, staff_account.mpin_hash):
                 raise serializers.ValidationError("Invalid staff User ID or MPIN.")
         else:
@@ -150,7 +150,7 @@ class ManagedUserSerializer(serializers.ModelSerializer):
         return "ADMIN" if obj.is_superuser else "STAFF"
 
     def get_department(self, obj):
-        return getattr(getattr(obj, "staff_account", None), "department", "")
+        return getattr(getattr(obj, "staffaccount", None), "department", "")
 
 
 class ManagedUserCreateSerializer(serializers.Serializer):
@@ -167,8 +167,8 @@ class ManagedUserCreateSerializer(serializers.Serializer):
         return value
 
     def validate_mpin(self, value):
-        if not value.isdigit() or len(value) not in (4, 5, 6):
-            raise serializers.ValidationError("MPIN must contain 4 to 6 digits.")
+        if not value.isdigit() or len(value) != 4:
+            raise serializers.ValidationError("MPIN must contain exactly 4 digits.")
         return value
 
     @transaction.atomic

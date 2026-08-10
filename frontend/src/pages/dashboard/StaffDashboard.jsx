@@ -8,6 +8,8 @@ import {
   FaChartBar,
   FaClock,
   FaCreditCard,
+  FaEye,
+  FaEyeSlash,
   FaFileInvoice,
   FaMoneyBillWave,
   FaRupeeSign,
@@ -25,6 +27,13 @@ function StaffDashboard() {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [dashboardError, setDashboardError] = useState("");
+  const [visibleValues, setVisibleValues] = useState({
+    deposit: false,
+    returned: false,
+    sales: false,
+    cash: false,
+    online: false,
+  });
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -45,6 +54,10 @@ function StaffDashboard() {
   const storedUser = localStorage.getItem("user");
   const user = storedUser ? JSON.parse(storedUser) : null;
   const transactions = dashboardData?.recent_transactions || [];
+  const toggleValue = (key) => {
+    setVisibleValues((current) => ({ ...current, [key]: !current[key] }));
+  };
+  const maskedValue = "••••";
 
   const todayDate = new Date().toLocaleDateString("en-IN", {
     day: "2-digit",
@@ -89,7 +102,12 @@ function StaffDashboard() {
             <div className="stat-icon deposit-icon"><FaArrowDown /></div>
             <div className="stat-text">
               <span>Today's Gold Deposit</span>
-              <h2>{Number(dashboardData?.today_gold_deposit || 0).toFixed(3)}</h2>
+              <div className="dashboard-value-row">
+                <h2>{visibleValues.deposit ? Number(dashboardData?.today_gold_deposit || 0).toFixed(3) : maskedValue}</h2>
+                <button type="button" className="dashboard-value-eye" onClick={() => toggleValue("deposit")} aria-label={visibleValues.deposit ? "Hide gold deposit" : "Show gold deposit"}>
+                  {visibleValues.deposit ? <FaEye /> : <FaEyeSlash />}
+                </button>
+              </div>
               <p>grams</p>
             </div>
           </div>
@@ -98,21 +116,29 @@ function StaffDashboard() {
             <div className="stat-icon return-icon"><FaArrowUp /></div>
             <div className="stat-text">
               <span>Today's Gold Return</span>
-              <h2>{Number(dashboardData?.today_gold_return || 0).toFixed(3)}</h2>
+              <div className="dashboard-value-row">
+                <h2>{visibleValues.returned ? Number(dashboardData?.today_gold_return || 0).toFixed(3) : maskedValue}</h2>
+                <button type="button" className="dashboard-value-eye" onClick={() => toggleValue("returned")} aria-label={visibleValues.returned ? "Hide gold return" : "Show gold return"}>
+                  {visibleValues.returned ? <FaEye /> : <FaEyeSlash />}
+                </button>
+              </div>
               <p>grams</p>
             </div>
           </div>
 
           <div className="stat-card">
-            <div className="stat-icon sales-icon"><FaRupeeSign /></div>
+              <div className="stat-icon sales-icon"><FaRupeeSign /></div>
             <div className="stat-text">
               <span>Today's Sales (Total)</span>
-              <h2>
-                ₹{Number(dashboardData?.today_sales || 0).toLocaleString("en-IN", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-              </h2>
+              <div className="dashboard-value-row">
+                <h2>{visibleValues.sales ? `₹${Number(dashboardData?.today_sales || 0).toLocaleString("en-IN", {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}` : maskedValue}</h2>
+                <button type="button" className="dashboard-value-eye" onClick={() => toggleValue("sales")} aria-label={visibleValues.sales ? "Hide today's sales" : "Show today's sales"}>
+                  {visibleValues.sales ? <FaEye /> : <FaEyeSlash />}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -122,11 +148,14 @@ function StaffDashboard() {
               <div>
                 <span>Cash Received</span>
                 <strong>
-                  ₹{Number(dashboardData?.cash_received || 0).toLocaleString("en-IN", {
+                  {visibleValues.cash ? `₹${Number(dashboardData?.cash_received || 0).toLocaleString("en-IN", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
-                  })}
+                  })}` : maskedValue}
                 </strong>
+                <button type="button" className="dashboard-value-eye" onClick={() => toggleValue("cash")} aria-label={visibleValues.cash ? "Hide cash received" : "Show cash received"}>
+                  {visibleValues.cash ? <FaEye /> : <FaEyeSlash />}
+                </button>
               </div>
             </div>
             <div className="payment-divider" />
@@ -135,11 +164,14 @@ function StaffDashboard() {
               <div>
                 <span>Online Received</span>
                 <strong>
-                  ₹{Number(dashboardData?.online_received || 0).toLocaleString("en-IN", {
+                  {visibleValues.online ? `₹${Number(dashboardData?.online_received || 0).toLocaleString("en-IN", {
                     minimumFractionDigits: 2,
                     maximumFractionDigits: 2,
-                  })}
+                  })}` : maskedValue}
                 </strong>
+                <button type="button" className="dashboard-value-eye" onClick={() => toggleValue("online")} aria-label={visibleValues.online ? "Hide online received" : "Show online received"}>
+                  {visibleValues.online ? <FaEye /> : <FaEyeSlash />}
+                </button>
               </div>
             </div>
           </div>

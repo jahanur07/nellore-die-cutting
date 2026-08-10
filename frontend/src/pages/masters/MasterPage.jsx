@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import {
   FaEdit,
+  FaFileExcel,
   FaSave,
   FaSearch,
   FaTools,
@@ -16,6 +17,7 @@ import {
   deleteDiePrice,
   getDiePrices,
   updateDiePrice,
+  importDiePrices,
 } from "../../services/masterService";
 
 // MasterPage manages the Die Price catalog.
@@ -42,6 +44,7 @@ function MasterPage() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [importing, setImporting] = useState(false);
 
 
   const loadDiePrices = async (searchText = "") => {
@@ -324,6 +327,27 @@ function MasterPage() {
     await loadDiePrices("");
   };
 
+  const handleExcelImport = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setImporting(true);
+    setMessage("");
+    setError("");
+    try {
+      const result = await importDiePrices(file);
+      setMessage(result.detail || "Die items imported successfully.");
+      await loadDiePrices(search);
+    } catch (err) {
+      const responseData = err.response?.data;
+      const rowErrors = responseData?.errors?.join(" ");
+      setError(rowErrors || responseData?.detail || "Unable to import Excel file.");
+    } finally {
+      setImporting(false);
+    }
+  };
+
 
   return (
 
@@ -512,6 +536,18 @@ function MasterPage() {
             </div>
 
           </form>
+
+          <div className="master-excel-import">
+            <div>
+              <strong>Import from Excel</strong>
+              <span>Columns: name, rate; optional: die_code, is_active</span>
+            </div>
+            <label className={`master-excel-button ${importing ? "disabled" : ""}`}>
+              <FaFileExcel />
+              {importing ? "Importing..." : "Choose Excel File"}
+              <input type="file" accept=".xlsx,.xlsm" onChange={handleExcelImport} disabled={importing} />
+            </label>
+          </div>
 
         </section>
 

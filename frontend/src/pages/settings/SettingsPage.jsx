@@ -392,7 +392,7 @@ function SettingsPage() {
         <form className="settings-form-grid two-col" onSubmit={handleCreateUser}>
           <div className="settings-field"><label>Username</label><input required value={userForm.username} onChange={(e) => setUserForm({ ...userForm, username: e.target.value })} disabled={disabled} /></div>
           <div className="settings-field"><label>Email</label><input type="email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} disabled={disabled} /></div>
-          <div className="settings-field"><label>Staff MPIN</label><input required minLength="4" maxLength="6" inputMode="numeric" type="password" value={userForm.mpin} onChange={(e) => setUserForm({ ...userForm, mpin: e.target.value.replace(/\D/g, "").slice(0, 6) })} disabled={disabled} /></div>
+          <div className="settings-field"><label>Staff MPIN (4 digits)</label><input required minLength="4" maxLength="4" inputMode="numeric" type="password" value={userForm.mpin} onChange={(e) => setUserForm({ ...userForm, mpin: e.target.value.replace(/\D/g, "").slice(0, 4) })} disabled={disabled} /></div>
           <div className="settings-field"><label>Role</label><select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} disabled={disabled}><option value="STAFF">Staff</option><option value="ADMIN">Administrator</option></select></div>
           <div className="settings-field"><label>Department</label><input value={userForm.department} onChange={(e) => setUserForm({ ...userForm, department: e.target.value })} disabled={disabled} /></div>
           <button className="settings-primary-action" type="submit" disabled={disabled || userSaving}>{userSaving ? "Creating..." : "Create User"}</button>

@@ -819,7 +819,7 @@ function BillingPage() {
                     <button
                       key={category.key}
                       type="button"
-                      className={`billing - filter - pill ${ selectedDieCategory === category.key ? "active" : "" } `}
+                      className={`billing-filter-pill ${selectedDieCategory === category.key ? "active" : ""}`}
                       onClick={() => setSelectedDieCategory(category.key)}
                     >
                       {category.label}
@@ -829,17 +829,21 @@ function BillingPage() {
 
                 <div className="billing-die-grid" ref={dieGridRef}>
                   {visibleDies.map((die, index) => {
-                    const inBill = billItems.some((item) => item.die_id === die.id);
+                    const itemInBill = billItems.find((item) => item.die_id === die.id);
                     return (
                       <button
                         key={die.id}
-                        className={`billing - die - button ${ inBill ? "selected" : "" } `}
+                        type="button"
+                        className={`billing-die-button ${itemInBill ? "selected" : ""}`}
                         style={{ backgroundColor: getDieColor(die, index) }}
                         onClick={() => addBillItem(die)}
-                        title={`${ die.die_code } - ${ die.name } - ${ die.rate } `}
+                        title={`${die.die_code} - ${die.name} - ${die.rate}`}
+                        aria-label={`Add ${die.die_code}, ${die.name}`}
                       >
-                        <div className="die-label">{die.die_code}</div>
-                        <div className="die-price">Rs {Number(die.rate).toFixed(2)}</div>
+                        <span className="die-label">{die.die_code}</span>
+                        <span className="die-work-name">{die.name}</span>
+                        <span className="die-price">Rs {Number(die.rate).toFixed(2)}</span>
+                        {itemInBill && <span className="die-quantity-badge">×{itemInBill.quantity}</span>}
                       </button>
                     );
                   })}
@@ -1104,14 +1108,14 @@ function BillingPage() {
                 <div className="payment-options">
                   <button
                     type="button"
-                    className={`payment - btn ${ paymentMode === "cash" ? "active" : "" } `}
+                    className={`payment-btn ${paymentMode === "cash" ? "active" : ""}`}
                     onClick={() => setPaymentMode("cash")}
                   >
                     Cash
                   </button>
                   <button
                     type="button"
-                    className={`payment - btn ${ paymentMode === "online" ? "active" : "" } `}
+                    className={`payment-btn ${paymentMode === "online" ? "active" : ""}`}
                     onClick={() => setPaymentMode("online")}
                   >
                     Online

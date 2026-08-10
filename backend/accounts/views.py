@@ -176,7 +176,7 @@ class ManagedUserListCreateView(APIView):
     def get(self, request):
         if not self._check_admin(request):
             return Response({"detail": "Administrator access is required."}, status=status.HTTP_403_FORBIDDEN)
-        users = get_user_model().objects.select_related("staff_account").order_by("username")
+        users = get_user_model().objects.select_related("staffaccount").order_by("username")
         return Response(ManagedUserSerializer(users, many=True).data)
 
     def post(self, request):
@@ -196,7 +196,7 @@ class ManagedUserDetailView(APIView):
             return Response({"detail": "Administrator access is required."}, status=status.HTTP_403_FORBIDDEN)
         user_model = get_user_model()
         try:
-            user = user_model.objects.select_related("staff_account").get(pk=pk)
+            user = user_model.objects.select_related("staffaccount").get(pk=pk)
         except user_model.DoesNotExist:
             return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
 
@@ -218,8 +218,8 @@ class ManagedUserDetailView(APIView):
             staff.save(update_fields=["department"])
         if "mpin" in request.data:
             mpin = str(request.data["mpin"])
-            if not mpin.isdigit() or len(mpin) not in (4, 5, 6):
-                return Response({"detail": "MPIN must contain 4 to 6 digits."}, status=status.HTTP_400_BAD_REQUEST)
+            if not mpin.isdigit() or len(mpin) != 4:
+                return Response({"detail": "MPIN must contain exactly 4 digits."}, status=status.HTTP_400_BAD_REQUEST)
             staff.mpin_hash = make_password(mpin)
             staff.save(update_fields=["mpin_hash"])
 
