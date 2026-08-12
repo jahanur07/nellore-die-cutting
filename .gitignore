@@ -1,5 +1,6 @@
 # Python
 venv/
+backend/.venv/
 __pycache__/
 *.pyc
 *.sqlite3
@@ -9,6 +10,8 @@ db.sqlite3
 # React
 frontend/node_modules/
 frontend/dist/
+backend/staticfiles/
+frontend/frontend-dist.zip
 
 # macOS
 .DS_Store

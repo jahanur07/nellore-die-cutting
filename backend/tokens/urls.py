@@ -4,6 +4,7 @@ from .views import (
     TokenListCreateView,
     CustomerTokenListView,
     TokenByNumberView,
+    TokenDetailView,
 )
 
 
@@ -32,5 +33,6 @@ urlpatterns = [
         TokenByNumberView.as_view(),
         name="token-by-number",
     ),
+    path("<int:pk>/", TokenDetailView.as_view(), name="token-detail"),
 
 ]

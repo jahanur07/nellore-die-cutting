@@ -4,6 +4,7 @@ from .views import (
     DiePriceListCreateView,
     DiePriceDetailView,
     DiePriceExcelImportView,
+    DiePriceExcelTemplateView,
 )
 
 
@@ -19,6 +20,7 @@ urlpatterns = [
         name="die-price-list-create",
     ),
     path("die-prices/import/", DiePriceExcelImportView.as_view(), name="die-price-import"),
+    path("die-prices/template/", DiePriceExcelTemplateView.as_view(), name="die-price-template"),
 
     # GET/PATCH/DELETE /api/masters/die-prices/<id>/ — view, update, or delete
     path(

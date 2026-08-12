@@ -39,14 +39,14 @@ class DiePriceSerializer(
             "updated_at",
         ]
 
-    # Validate the die/work name: must be at least 2 characters
+    # The legacy database field is named `name`, but the client uses it as Die No.
     def validate_name(self, value):
 
         value = value.strip()
 
-        if len(value) < 2:
+        if not value:
             raise serializers.ValidationError(
-                "Please enter a valid die/work name."
+                "Die No. is required."
             )
 
         return value

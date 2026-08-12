@@ -8,6 +8,7 @@ import {
   FaCreditCard,
   FaFileInvoice,
   FaGem,
+  FaHome,
   FaMoneyBillWave,
   FaReceipt,
   FaTag,
@@ -130,7 +131,7 @@ function AdminDashboard() {
           </div>
           <div className="admin-dashboard-userbar">
             <div className="admin-dashboard-date"><FaCalendarAlt /><span>{dateLabel}</span></div>
-            <div className="admin-dashboard-user"><FaUserCircle /><div><strong>{user?.username || "Admin"}</strong><small>Super Admin</small></div></div>
+            <div className="admin-dashboard-user" aria-label="Admin profile"><FaUserCircle /><div><strong>{user?.username || "Admin"}</strong><small>Super Admin</small></div></div>
           </div>
         </header>
 
@@ -141,6 +142,7 @@ function AdminDashboard() {
           <section className="admin-stats-grid" aria-label="Today at a glance">
             <StatCard icon={<FaWallet />} tone="green" title="Gold Deposit" value={weight(today.gold_deposit)} detail={money(today.sales)} />
             <StatCard icon={<FaWeight />} tone="blue" title="Gold Return" value={weight(today.gold_return)} detail={weight(today.net_weight)} />
+            <StatCard icon={<FaGem />} tone="green" title="Gold Earning" value={weight(today.net_weight)} detail="Deposit − Return" />
             <StatCard icon={<FaReceipt />} tone="orange" title="Today's Bill" value={String(today.bill_count)} detail={money(today.sales)} />
             <StatCard icon={<FaCreditCard />} tone="purple" title="Payments"><div className="admin-payment-lines"><span>Cash <b>{money(today.cash)}</b></span><span>Online <b>{money(today.online)}</b></span></div></StatCard>
             <StatCard icon={<FaFileInvoice />} tone="blue" title="Total Bills" value={String(today.bill_count)} detail="Today" />
@@ -199,6 +201,13 @@ function AdminDashboard() {
           </section>
         </div>
       </main>
+      <nav className="admin-mobile-bottom-nav" aria-label="Mobile navigation">
+        <button type="button" className="active" onClick={() => navigate("/admin-dashboard")}><FaHome /><span>Dashboard</span></button>
+        <button type="button" onClick={() => navigate("/billing")}><FaReceipt /><span>Bill &amp; Gold Return</span></button>
+        <button type="button" className="admin-mobile-add" onClick={() => navigate("/tokens")} aria-label="Token and Gold Deposit"><FaTag /><span>Token &amp; Gold Deposit</span></button>
+        <button type="button" onClick={() => navigate("/reports")}><FaChartBar /><span>Reports</span></button>
+        <button type="button" onClick={() => navigate("/settings")}><FaCog /><span>More</span></button>
+      </nav>
     </div>
   );
 }

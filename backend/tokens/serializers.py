@@ -26,6 +26,17 @@ class TokenSerializer(serializers.ModelSerializer):
         allow_blank=True
     )
 
+    customer_name = serializers.CharField(
+        required=False,
+        allow_blank=True,
+    )
+
+    customer_address = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+    )
+
     total_returned = serializers.SerializerMethodField()
     remaining_gold = serializers.SerializerMethodField()
 
@@ -38,6 +49,8 @@ class TokenSerializer(serializers.ModelSerializer):
             "customer",
             "customer_code",
             "customer_mobile",
+            "customer_name",
+            "customer_address",
             "gold_weight",
             "total_returned",
             "remaining_gold",
@@ -74,6 +87,12 @@ class TokenSerializer(serializers.ModelSerializer):
         customer = attrs.get("customer")
         customer_mobile = attrs.get("customer_mobile", "").strip()
 
+        # Token edits usually update only weight/remarks. During a partial
+        # update, keep the token's existing customer instead of requiring the
+        # customer mobile field again.
+        if self.instance and not customer and not customer_mobile:
+            return attrs
+
         if customer:
             attrs["customer_mobile"] = customer.mobile
             return attrs
@@ -94,18 +113,22 @@ class TokenSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         customer = validated_data.get("customer")
+        customer_name = validated_data.pop("customer_name", "").strip()
+        customer_address = validated_data.pop("customer_address", "").strip()
 
         if not customer:
             customer, created = Customer.objects.get_or_create(
                 mobile=validated_data["customer_mobile"],
                 defaults={
-                    "name": "Walk-in Customer",
-                    "address": "",
+                    "name": customer_name or "Walk-in Customer",
+                    "address": customer_address,
                     "created_by": validated_data["created_by"],
                 },
             )
 
             validated_data["customer"] = customer
             validated_data["customer_mobile"] = customer.mobile
+
+        validated_data["customer_name"] = customer.name
 
         return super().create(validated_data)

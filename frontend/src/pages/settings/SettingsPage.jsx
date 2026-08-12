@@ -20,6 +20,7 @@ import {
   FaWeight,
 } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
+import { jsPDF } from "jspdf";
 
 import Sidebar from "../../components/layout/Sidebar";
 import {
@@ -65,6 +66,7 @@ const DEFAULT_SETTINGS = {
   whatsapp_daily_summary: false,
   backup_reminder: true,
   bill_print_sound: true,
+  allow_token_edit: false,
   auto_logout_minutes: 30,
   entries_per_page: 10,
   theme_mode: "LIGHT",
@@ -307,15 +309,93 @@ function SettingsPage() {
     setBackupLoading(true);
     setError("");
     try {
-      const blob = await downloadDataBackup();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `nellore-die-cutting-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
+      const backupBlob = await downloadDataBackup();
+      const backupText = await backupBlob.text();
+      const backup = JSON.parse(backupText);
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const left = 40;
+      const right = 555;
+      let y = 44;
+
+      const writeText = (text, size = 9, bold = false) => {
+        doc.setFont("helvetica", bold ? "bold" : "normal");
+        doc.setFontSize(size);
+        const lines = doc.splitTextToSize(String(text), right - left);
+        for (const line of lines) {
+          if (y > 790) {
+            doc.addPage();
+            y = 44;
+          }
+          doc.text(line, left, y);
+          y += size + 4;
+        }
+      };
+
+      writeText("Nellore Die Cutting - Full Backup", 17, true);
+      writeText(`Created: ${backup.created_at || new Date().toISOString()}`, 10);
+      y += 8;
+      writeText("Data Summary", 12, true);
+      Object.entries(dataSummary || {}).forEach(([key, value]) => writeText(`${key}: ${value}`, 10));
+      y += 8;
+
+      const backupData = backup.data || {};
+      const getRecords = (key) => {
+        try {
+          const value = backupData[key] || [];
+          return typeof value === "string" ? JSON.parse(value) : value;
+        } catch {
+          return [];
+        }
+      };
+
+      const addTable = (title, headers, rows) => {
+        if (!rows.length) return;
+        if (y > 745) {
+          doc.addPage();
+          y = 44;
+        }
+        writeText(title, 12, true);
+        const tableWidth = right - left;
+        const columnWidth = tableWidth / headers.length;
+        const drawHeader = () => {
+          doc.setFillColor(52, 64, 18);
+          doc.setTextColor(255, 255, 255);
+          doc.rect(left, y - 9, tableWidth, 18, "F");
+          headers.forEach((header, index) => doc.text(String(header), left + index * columnWidth + 4, y + 3));
+          doc.setTextColor(0, 0, 0);
+          y += 18;
+        };
+
+        drawHeader();
+        rows.forEach((row) => {
+          const cells = row.map((value) => doc.splitTextToSize(String(value ?? ""), columnWidth - 8));
+          const rowHeight = Math.max(...cells.map((cell) => cell.length), 1) * 9 + 6;
+          if (y + rowHeight > 800) {
+            doc.addPage();
+            y = 44;
+            drawHeader();
+          }
+          doc.setDrawColor(210, 216, 204);
+          doc.rect(left, y - 8, tableWidth, rowHeight);
+          cells.forEach((cell, index) => {
+            doc.text(cell, left + index * columnWidth + 4, y + 1);
+            if (index > 0) doc.line(left + index * columnWidth, y - 8, left + index * columnWidth, y - 8 + rowHeight);
+          });
+          y += rowHeight;
+        });
+        y += 18;
+      };
+
+      const fields = (key) => getRecords(key).map((record) => ({ id: record.pk, ...record.fields }));
+      const records = fields("customers");
+      addTable("Customers", ["ID", "Customer Code", "Name", "Mobile", "Address"], records.map((row) => [row.id, row.customer_code, row.name, row.mobile, row.address]));
+      addTable("Tokens", ["ID", "Token No.", "Mobile", "Gold Weight", "Created At"], fields("tokens").map((row) => [row.id, row.token_number, row.customer_mobile, row.gold_weight, row.created_at]));
+      addTable("Die Prices", ["ID", "SL No.", "Die No.", "Rate / Piece", "Active"], fields("die_prices").map((row) => [row.id, row.die_code, row.name, row.rate, row.is_active ? "Yes" : "No"]));
+      addTable("Bills", ["ID", "Bill No.", "Customer ID", "Token ID", "Gold Return", "Final Amount", "Payment"], fields("bills").map((row) => [row.id, row.bill_number, row.customer, row.token, row.gold_return, row.final_amount, row.payment_method]));
+      addTable("Bill Items", ["ID", "Bill ID", "SL No.", "Work", "Rate", "Qty", "Amount"], fields("bill_items").map((row) => [row.id, row.bill, row.die_code, row.work_name, row.rate, row.quantity, row.amount]));
+      addTable("System Settings", ["Setting", "Value"], fields("settings").flatMap((row) => Object.entries(row).filter(([key]) => key !== "id").map(([key, value]) => [key, value])));
+
+      doc.save(`nellore-die-cutting-backup-${new Date().toISOString().slice(0, 10)}.pdf`);
       setSuccess("Backup downloaded successfully.");
     } catch {
       setError("Unable to download backup.");
@@ -418,7 +498,7 @@ function SettingsPage() {
     <section className="settings-users-grid">
       <article className="settings-card">
         <h3><FaDatabase /> BACKUP & DATA</h3>
-        <p className="settings-card-description">Download a JSON backup containing customers, tokens, bills, die prices, bill items, and system settings.</p>
+        <p className="settings-card-description">Download a PDF backup containing customers, tokens, bills, die prices, bill items, and system settings.</p>
         <button type="button" className="settings-primary-action" onClick={handleBackup} disabled={!canEdit || backupLoading}>
           <FaDownload /> <span>{backupLoading ? "Preparing Backup..." : "Download Full Backup"}</span>
         </button>
@@ -875,6 +955,14 @@ function SettingsPage() {
                     disabled={disabled}
                     onChange={(next) => updateField("backup_reminder", next)}
                   />
+                </div>
+
+                <div className="setting-row">
+                  <div>
+                    <p>Allow Token Editing</p>
+                    <small>Allow staff to edit existing tokens from the Token page.</small>
+                  </div>
+                  <Toggle checked={Boolean(formData.allow_token_edit)} disabled={disabled} onChange={(next) => updateField("allow_token_edit", next)} />
                 </div>
 
                 <div className="setting-row">

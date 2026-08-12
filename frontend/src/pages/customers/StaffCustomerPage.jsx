@@ -8,6 +8,7 @@ import {
   FaFileInvoice,
   FaLock,
   FaPhoneAlt,
+  FaPrint,
   FaRupeeSign,
   FaSave,
   FaSearch,
@@ -17,6 +18,9 @@ import {
 } from "react-icons/fa";
 
 import Sidebar from "../../components/layout/Sidebar";
+import { getBills } from "../../services/billingService";
+import { getBillingProfile } from "../../services/settingsService";
+import { printCustomerBills } from "../../utils/printCustomerBills";
 import {
   getStaffCustomerSummary,
   updateCustomer,
@@ -69,6 +73,7 @@ function StaffCustomerPage() {
   const [editForm, setEditForm] = useState({ name: "", mobile: "", address: "" });
   const [editError, setEditError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [printingCustomerId, setPrintingCustomerId] = useState(null);
 
   const loadCustomers = async ({
     page = pagination.page,
@@ -224,6 +229,33 @@ function StaffCustomerPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handlePrintCustomerBills = async (customer) => {
+    const printWindow = window.open("", "_blank", "width=850,height=900");
+    if (!printWindow) {
+      setError("Printing was blocked. Please allow pop-ups for this site.");
+      return;
+    }
+    setPrintingCustomerId(customer.id);
+    setError("");
+    try {
+      const bills = await getBills(customer.mobile);
+      if (!bills.length) {
+        printWindow.close();
+        setError("This customer has no bills to print.");
+        return;
+      }
+      const printConfig = await getBillingProfile().catch(() => ({}));
+      if (!printCustomerBills(customer, bills, printWindow, printConfig)) {
+        setError("Printing was blocked. Please allow pop-ups for this site.");
+      }
+    } catch {
+      printWindow.close();
+      setError("Unable to load this customer's bills.");
+    } finally {
+      setPrintingCustomerId(null);
+    }
+  };
+
   const dateLabel = new Date().toLocaleDateString("en-IN", {
     day: "2-digit",
     month: "short",
@@ -364,6 +396,17 @@ function StaffCustomerPage() {
                       <td>{formatCurrency(customer.total_billing_amount)}</td>
                       <td>{formatDate(customer.last_visit)}</td>
                       <td>
+                        <div className="admin-customer-row-actions">
+                          <button
+                            type="button"
+                            className="admin-customer-print-button"
+                            onClick={() => handlePrintCustomerBills(customer)}
+                            disabled={printingCustomerId === customer.id}
+                            title="Print customer bills"
+                            aria-label="Print customer bills"
+                          >
+                            <FaPrint />
+                          </button>
                         <button
                           type="button"
                           className={`admin-customer-access-button ${canEdit ? "unlocked" : "locked"}`}
@@ -374,6 +417,7 @@ function StaffCustomerPage() {
                         >
                           {canEdit ? <FaEdit /> : <FaLock />}
                         </button>
+                        </div>
                       </td>
                     </tr>
                   );

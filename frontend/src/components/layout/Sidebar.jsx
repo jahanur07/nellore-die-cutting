@@ -1,4 +1,5 @@
 import { logoutUser } from "../../services/authService";
+import { useState } from "react";
 
 import {
   FaChartBar,
@@ -18,6 +19,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 // It highlights the currently active page using NavLink's isActive prop.
 function Sidebar() {
   const navigate = useNavigate();
+  const [moreOpen, setMoreOpen] = useState(false);
   const storedUser = localStorage.getItem("user");
   let user = null;
 
@@ -59,20 +61,36 @@ function Sidebar() {
           <NavLink
             key={item.name}
             to={item.path}
-            className={({ isActive }) =>
-              isActive ? "sidebar-link active" : "sidebar-link"
-            }
+            className={({ isActive }) => `sidebar-link sidebar-link-${item.name.toLowerCase().replace(/[^a-z]+/g, "-")} ${isActive ? "active" : ""}`}
           >
             {item.icon}
             <span>{item.name}</span>
           </NavLink>
         ))}
 
-        <button className="sidebar-link logout-link" onClick={logout}>
+        <button className="sidebar-link logout-link sidebar-link-logout" onClick={logout}>
           <FaSignOutAlt />
           <span>Logout</span>
         </button>
+
+        <button
+          type="button"
+          className={`sidebar-link mobile-more-link ${moreOpen ? "active" : ""}`}
+          onClick={() => setMoreOpen((open) => !open)}
+          aria-expanded={moreOpen}
+        >
+          <FaHeadset />
+          <span>More</span>
+        </button>
       </nav>
+
+      {moreOpen && (
+        <div className="mobile-more-menu">
+          <NavLink to="/customers" onClick={() => setMoreOpen(false)}><FaUsers />Customers</NavLink>
+          {user?.is_superuser && <NavLink to="/settings" onClick={() => setMoreOpen(false)}><FaCog />Settings</NavLink>}
+          <button type="button" onClick={logout}><FaSignOutAlt />Logout</button>
+        </div>
+      )}
 
       <div className="sidebar-help">
         <FaHeadset />

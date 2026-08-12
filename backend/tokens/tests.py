@@ -39,6 +39,30 @@ class TokenCreationTests(APITestCase):
 		self.assertEqual(token.customer_name, self.customer.name)
 		self.assertEqual(token.customer_mobile, self.customer.mobile)
 		self.assertEqual(str(token.gold_weight), "1.250")
+		self.assertRegex(token.token_number, r"^TK\d{3,}$")
+
+	def test_repeated_mobile_creates_a_new_sequential_token_for_same_customer(self):
+		first = self.client.post(
+			reverse("token-list-create"),
+			{
+				"customer_mobile": self.customer.mobile,
+				"gold_weight": "1.000",
+			},
+			format="json",
+		)
+		second = self.client.post(
+			reverse("token-list-create"),
+			{
+				"customer_mobile": self.customer.mobile,
+				"gold_weight": "2.000",
+			},
+			format="json",
+		)
+
+		self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+		self.assertEqual(second.status_code, status.HTTP_201_CREATED)
+		self.assertEqual(Customer.objects.filter(mobile=self.customer.mobile).count(), 1)
+		self.assertNotEqual(first.data["token_number"], second.data["token_number"])
 
 	def test_looks_up_token_by_number_with_its_customer(self):
 		token = Token.objects.create(

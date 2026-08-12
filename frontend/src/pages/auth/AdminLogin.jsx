@@ -110,7 +110,7 @@ function AdminLogin() {
 
         <footer className="admin-login-footer">
           <p><FaShieldAlt /> This is a secure area. Unauthorized access is prohibited.</p>
-          <p>&copy; 2024 Nellore Die Cutting. All rights reserved.</p>
+          <p>&copy; 2026 Nellore Die Cutting. All rights reserved.</p>
         </footer>
       </section>
     </main>

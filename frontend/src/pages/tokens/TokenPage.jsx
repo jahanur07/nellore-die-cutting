@@ -20,7 +20,7 @@ import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/layout/Sidebar";
 import useWeighingMachine from "../../hooks/useWeighingMachine";
 import { getBusinessProfile, getWeighingMachineConfig } from "../../services/settingsService";
-import { createToken, getTokens } from "../../services/tokenService";
+import { createToken, getTokens, updateToken } from "../../services/tokenService";
 
 const DEFAULT_BUSINESS_PROFILE = {
   shop_name: "Nellore Die Cutting",
@@ -37,6 +37,14 @@ const escapePrintText = (value) => String(value ?? "")
 
 function TokenPage() {
   const navigate = useNavigate();
+  const loggedInUser = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      return null;
+    }
+  })();
+  const isAdmin = Boolean(loggedInUser?.is_superuser);
 
   const [formData, setFormData] = useState({
     customer_mobile: "",
@@ -48,6 +56,8 @@ function TokenPage() {
   const [weightMode, setWeightMode] = useState(() => localStorage.getItem("preferredWeightMode") || "machine");
   const [manualWeightAllowed, setManualWeightAllowed] = useState(false);
   const [machineConfig, setMachineConfig] = useState({ weighing_machine_enabled: false });
+  const [tokenEditAllowed, setTokenEditAllowed] = useState(isAdmin);
+  const [editingTokenId, setEditingTokenId] = useState(null);
   const [tokens, setTokens] = useState([]);
   const [createdToken, setCreatedToken] = useState(null);
   const [businessProfile, setBusinessProfile] = useState(DEFAULT_BUSINESS_PROFILE);
@@ -64,9 +74,6 @@ function TokenPage() {
   const displayedWeight = weightMode === "manual" ? manualWeight : formData.gold_weight;
 
   useEffect(() => {
-    const num = Math.floor(Math.random() * 100000);
-    setTokenNumber(`T${String(num).padStart(5, "0")}`);
-
     const now = new Date();
     const dateStr = now.toLocaleDateString("en-IN", {
       day: "2-digit",
@@ -111,6 +118,9 @@ function TokenPage() {
         const config = await getWeighingMachineConfig();
         setMachineConfig(config || {});
         setManualWeightAllowed(Boolean(config?.allow_manual_weight_entry));
+        // Admins can always edit. Staff can edit only when the admin enables
+        // Allow Token Editing in Settings.
+        setTokenEditAllowed(isAdmin || Boolean(config?.allow_token_edit));
       } catch {
         // Keep manual entry unavailable if the settings policy cannot be loaded.
         setMachineConfig({ weighing_machine_enabled: false });
@@ -119,7 +129,7 @@ function TokenPage() {
     };
 
     loadWeighingConfig();
-  }, []);
+  }, [isAdmin]);
 
   const {
     status: machineStatus,
@@ -167,11 +177,11 @@ function TokenPage() {
 
   // If admin turns manual entry off while it is active, fall back to machine mode.
   useEffect(() => {
-    if (weightMode === "manual" && !manualWeightAllowed) {
+    if (weightMode === "manual" && !manualWeightAllowed && !editingTokenId) {
       setWeightModeWithStorage("machine");
       setManualWeight("");
     }
-  }, [manualWeightAllowed, weightMode]);
+  }, [editingTokenId, manualWeightAllowed, weightMode]);
 
   // Auto-fill Gold Deposit weight from the scale once a stable reading arrives,
   // but only while staff has not unlocked manual entry.
@@ -185,9 +195,43 @@ function TokenPage() {
     try {
       const data = await getTokens();
       setTokens(data.slice(0, 5));
+      const latestTokenNumber = data[0]?.token_number || "";
+      const latestNumber = Number(latestTokenNumber.match(/(\d+)$/)?.[1] || 0);
+      setTokenNumber(`TK${String(latestNumber + 1).padStart(3, "0")}`);
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const handlePrintExistingToken = async (token) => {
+    const printWindow = window.open("", "_blank", "width=440,height=720");
+    if (!printWindow) {
+      setError("Browser blocked the print window. Allow pop-ups for this site and try again.");
+      return;
+    }
+    try {
+      const profile = await getBusinessProfile();
+      if (!printToken(token, printWindow, profile)) printWindow.close();
+    } catch {
+      printWindow.close();
+      setError("Unable to print token.");
+    }
+  };
+
+  const handleEditToken = async (token) => {
+    setEditingTokenId(token.id);
+    setTokenNumber(token.token_number || "");
+    setFormData((current) => ({
+      ...current,
+      customer_mobile: token.customer_mobile || "",
+      gold_weight: String(token.gold_weight || ""),
+      remarks: token.remarks || "",
+    }));
+    setManualWeight(String(token.gold_weight || ""));
+    setWeightMode("manual");
+    setMessage(`${token.token_number} loaded for editing.`);
+    setMessageType("success");
+    setError("");
   };
 
   const handleChange = (e) => {
@@ -204,6 +248,7 @@ function TokenPage() {
   };
 
   const clearTokenForm = () => {
+    setEditingTokenId(null);
     setFormData({
       customer_mobile: "",
       gold_weight: "",
@@ -517,7 +562,7 @@ function TokenPage() {
 
     const finalWeight = weightMode === "manual" ? manualWeight : formData.gold_weight;
 
-    if (weightMode === "machine" && machineStableWeight === null) {
+    if (!editingTokenId && weightMode === "machine" && machineStableWeight === null) {
       if (!automaticCaptureEnabled) {
         setError(
           manualWeightAllowed
@@ -548,6 +593,27 @@ function TokenPage() {
       return;
     }
 
+    if (editingTokenId) {
+      try {
+        setLoading(true);
+        const updated = await updateToken(editingTokenId, {
+          gold_weight: weight.toFixed(3),
+          remarks: formData.remarks.trim(),
+        });
+        setTokens((current) => current.map((item) => item.id === updated.id ? updated : item));
+        if (createdToken?.id === updated.id) setCreatedToken(updated);
+        setMessage(`${updated.token_number} updated successfully.`);
+        setMessageType("success");
+        clearTokenForm();
+      } catch (editError) {
+        setError(editError.response?.data?.detail || "Unable to edit token.");
+        setErrorType("error");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     const printWindow = window.open("", "_blank", "width=440,height=720");
 
     try {
@@ -564,6 +630,7 @@ function TokenPage() {
 
       setTokens((prev) => [newToken, ...prev]);
       setCreatedToken(newToken);
+      setTokenNumber(newToken.token_number);
       setBusinessProfile(profile);
       const printed = printToken(newToken, printWindow, profile);
       setMessage(
@@ -830,7 +897,7 @@ function TokenPage() {
                     onChange={(e) => setManualWeight(e.target.value)}
                     step="0.01"
                     min="0"
-                    disabled={!manualWeightAllowed}
+                    disabled={!manualWeightAllowed && !editingTokenId}
                   />
                   <span className="manual-unit">gm</span>
                 </div>
@@ -859,16 +926,16 @@ function TokenPage() {
               <button
                 type="button"
                 className="btn-manual-weight"
-                disabled={!manualWeightAllowed}
+                disabled={!manualWeightAllowed && !editingTokenId}
                 onClick={() => {
-                  if (manualWeightAllowed) {
+                  if (manualWeightAllowed || editingTokenId) {
                     setWeightModeWithStorage("manual");
                   }
                 }}
               >
                 <FaPencilAlt /> Use Manual Weight
               </button>
-              {!manualWeightAllowed && (
+              {!manualWeightAllowed && !editingTokenId && (
                 <p className="billing-manual-weight-locked">
                   Manual weight entry is disabled by admin settings.
                 </p>
@@ -884,7 +951,7 @@ function TokenPage() {
               onClick={handleSubmit}
               disabled={loading}
             >
-              <FaPrint /> {loading ? "GENERATING TOKEN..." : "GENERATE TOKEN & PRINT"}
+              {editingTokenId ? <FaCheck /> : <FaPrint />} {loading ? (editingTokenId ? "SAVING CHANGES..." : "GENERATING TOKEN...") : (editingTokenId ? "SAVE TOKEN CHANGES" : "GENERATE TOKEN & PRINT")}
             </button>
             {createdToken && (
               <button type="button" className="btn-generate" onClick={handleReprint}>
@@ -912,6 +979,10 @@ function TokenPage() {
                   <span className="recent-token-no">{token.token_number}</span>
                   <span className="recent-customer">{token.customer_mobile}</span>
                   <span className="recent-weight">{Number(token.gold_weight).toFixed(3)} gm</span>
+                  <div className="recent-token-actions">
+                    <button type="button" title="Print token" onClick={() => handlePrintExistingToken(token)}><FaPrint /></button>
+                    <button type="button" title={tokenEditAllowed ? "Edit token" : "Token editing disabled by admin"} disabled={!tokenEditAllowed} onClick={() => handleEditToken(token)}><FaPencilAlt /></button>
+                  </div>
                 </div>
               ))}
             </div>

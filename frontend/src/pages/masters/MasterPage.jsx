@@ -18,11 +18,25 @@ import {
   getDiePrices,
   updateDiePrice,
   importDiePrices,
+  downloadDiePriceTemplate,
 } from "../../services/masterService";
 
+const formatDieNumber = (value) => {
+  const text = String(value ?? "").trim();
+  if (/^\d+$/.test(text)) {
+    return `DIE - ${text}`;
+  }
+  return text;
+};
+
+const dieNumberDigits = (value) => String(value ?? "")
+  .toUpperCase()
+  .replace(/^DIE\s*-?\s*/, "")
+  .replace(/\D/g, "");
+
 // MasterPage manages the Die Price catalog.
-// Each die type (e.g. "Small Die", "Large Die") has a name, rate per gram,
-// and an active/inactive flag. Active dies appear in the Billing page dropdown.
+// Each die record has a client-facing Die No., rate per piece, and active status.
+// Active dies appear in the Billing page dropdown.
 function MasterPage() {
 
   // List of all die prices shown in the table
@@ -87,13 +101,14 @@ function MasterPage() {
       checked,
     } = e.target;
 
+    const nextValue = name === "name" ? dieNumberDigits(value) : value;
     setFormData((previous) => ({
       ...previous,
 
       [name]:
         type === "checkbox"
           ? checked
-          : value,
+          : nextValue,
     }));
   };
 
@@ -120,10 +135,10 @@ function MasterPage() {
     setMessage("");
     setError("");
 
-    if (formData.name.trim().length < 2) {
+    if (!formData.name.trim()) {
 
       setError(
-        "Please enter a valid die/work name."
+        "Die No. is required."
       );
 
       return;
@@ -148,7 +163,7 @@ function MasterPage() {
       setLoading(true);
 
       const data = {
-        name: formData.name.trim(),
+        name: formatDieNumber(formData.name),
         rate: formData.rate,
         is_active: formData.is_active,
       };
@@ -232,7 +247,7 @@ function MasterPage() {
     setEditingId(die.id);
 
     setFormData({
-      name: die.name,
+      name: formatDieNumber(die.name),
       rate: die.rate,
       is_active: die.is_active,
     });
@@ -250,7 +265,7 @@ function MasterPage() {
   const handleDelete = async (die) => {
 
     const confirmed = window.confirm(
-      `Delete ${die.name}?`
+      `Delete ${formatDieNumber(die.name)}?`
     );
 
     if (!confirmed) {
@@ -348,6 +363,23 @@ function MasterPage() {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    setError("");
+    try {
+      const blob = await downloadDiePriceTemplate();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "die-price-import-template.xlsx";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError("Unable to download the Excel template.");
+    }
+  };
+
 
   return (
 
@@ -404,7 +436,7 @@ function MasterPage() {
               </h2>
 
               <p>
-                Configure work type and rate per gram
+                Configure die number and rate per piece
               </p>
 
             </div>
@@ -438,16 +470,20 @@ function MasterPage() {
               <div className="master-field">
 
                 <label>
-                  Die / Work Name *
+                  Die No. *
                 </label>
 
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="Example: Chain Cutting"
-                />
+                <div className="master-die-number-input">
+                  <span>DIE -</span>
+                  <input
+                    type="text"
+                    name="name"
+                    inputMode="numeric"
+                    value={dieNumberDigits(formData.name)}
+                    onChange={handleChange}
+                    placeholder="00"
+                  />
+                </div>
 
               </div>
 
@@ -455,7 +491,7 @@ function MasterPage() {
               <div className="master-field">
 
                 <label>
-                  Rate per Gram (₹) *
+                  Rate per Piece (₹) *
                 </label>
 
                 <input
@@ -537,19 +573,18 @@ function MasterPage() {
 
           </form>
 
-          <div className="master-excel-import">
-            <div>
-              <strong>Import from Excel</strong>
-              <span>Columns: name, rate; optional: die_code, is_active</span>
-            </div>
-            <label className={`master-excel-button ${importing ? "disabled" : ""}`}>
-              <FaFileExcel />
-              {importing ? "Importing..." : "Choose Excel File"}
-              <input type="file" accept=".xlsx,.xlsm" onChange={handleExcelImport} disabled={importing} />
-            </label>
-          </div>
-
         </section>
+
+        <div className="master-excel-actions">
+          <label className={`master-excel-button ${importing ? "disabled" : ""}`}>
+            <FaFileExcel />
+            {importing ? "Uploading..." : "Upload Excel"}
+            <input type="file" accept=".xlsx,.xlsm" onChange={handleExcelImport} disabled={importing} />
+          </label>
+          <button type="button" className="master-clear-button" onClick={handleDownloadTemplate} disabled={importing}>
+            <FaFileExcel /> Download Template
+          </button>
+        </div>
 
 
         <section className="master-card master-list-card">
@@ -590,7 +625,7 @@ function MasterPage() {
                 onChange={(e) =>
                   setSearch(e.target.value)
                 }
-                placeholder="Search by code or work name..."
+                placeholder="Search by Die No. or SL No..."
               />
 
             </div>
@@ -624,11 +659,11 @@ function MasterPage() {
 
                 <tr>
 
-                  <th>Die Code</th>
+                  <th>SL No.</th>
 
-                  <th>Work Name</th>
+                  <th>Die No.</th>
 
-                  <th>Rate / gm</th>
+                  <th>Rate / Piece</th>
 
                   <th>Status</th>
 
@@ -679,7 +714,7 @@ function MasterPage() {
 
 
                       <td>
-                        {die.name}
+                          {formatDieNumber(die.name)}
                       </td>
 
 
@@ -769,7 +804,6 @@ function MasterPage() {
           </div>
 
         </section>
-
 
       </main>
 

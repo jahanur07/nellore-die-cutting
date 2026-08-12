@@ -100,6 +100,7 @@ class SystemSettings(models.Model):
 	whatsapp_daily_summary = models.BooleanField(default=False)
 	backup_reminder = models.BooleanField(default=True)
 	bill_print_sound = models.BooleanField(default=True)
+	allow_token_edit = models.BooleanField(default=False)
 
 	auto_logout_minutes = models.PositiveSmallIntegerField(choices=AUTO_LOGOUT_CHOICES, default=30)
 	entries_per_page = models.PositiveSmallIntegerField(choices=ENTRIES_PER_PAGE_CHOICES, default=10)

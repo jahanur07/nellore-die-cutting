@@ -31,3 +31,8 @@ export const getTokenByNumber = async (tokenNumber) => {
 
   return response.data;
 };
+
+export const updateToken = async (id, tokenData) => {
+  const response = await api.patch(`/tokens/${id}/`, tokenData);
+  return response.data;
+};

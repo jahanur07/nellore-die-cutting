@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -12,7 +13,8 @@ SECRET_KEY = "django-insecure-your-long-secret-key"
 DEBUG = False
 
 ALLOWED_HOSTS = [
-    "jahanur07.pythonanywhere.com",
+    "nellorediecutting.shop",
+    "www.nellorediecutting.shop",
     "localhost",
     "127.0.0.1",
 ]
@@ -140,6 +142,13 @@ REST_FRAMEWORK = {
     ),
 }
 
+SIMPLE_JWT = {
+    # Keep a logged-in counter session usable during the working day.
+    # The frontend also tracks this deadline and redirects cleanly when it expires.
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=5),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+}
+
 # -----------------------------------------------------------------------------
 # Frontend URL
 # -----------------------------------------------------------------------------
@@ -167,6 +176,9 @@ EMAIL_USE_TLS = True
 CORS_ALLOWED_ORIGINS = [
     "https://nellore-die-cutting.vercel.app",
     "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
 ]
 
 CORS_ALLOW_CREDENTIALS = True

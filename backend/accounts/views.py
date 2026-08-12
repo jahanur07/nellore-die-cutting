@@ -29,6 +29,7 @@ from .serializers import (
     ManagedUserCreateSerializer,
     ManagedUserSerializer,
 )
+from .models import StaffAccount
 
 
 def authentication_payload(user):

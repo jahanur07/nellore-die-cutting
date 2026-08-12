@@ -29,6 +29,10 @@ import { getCustomerTokens, getTokenByNumber } from "../../services/tokenService
 
 const money = (value) => Number.parseFloat(value || 0);
 const mapPaymentMethod = (mode) => (mode === "online" ? "ONLINE" : "CASH");
+const formatDieNumber = (value) => {
+  const text = String(value ?? "").trim();
+  return /^\d+$/.test(text) ? `DIE - ${text.padStart(3, "0")}` : text;
+};
 
 const formatError = (err) => {
   const data = err?.response?.data;
@@ -277,7 +281,11 @@ function BillingPage() {
   };
 
   const handleTokenNumberChange = (event) => {
-    const nextTokenNumber = event.target.value.toUpperCase();
+    const digits = event.target.value
+      .toUpperCase()
+      .replace(/^TK/, "")
+      .replace(/\D/g, "");
+    const nextTokenNumber = digits ? `TK${digits}` : "";
     setTokenNumber(nextTokenNumber);
     setTokenMessage("");
     setTokenMessageType("");
@@ -324,7 +332,9 @@ function BillingPage() {
       setCustomerMessage(`Customer found: ${customer.name}`);
       setCustomerMessageType("success");
 
-      if (availableTokens.length === 1) {
+      if (availableTokens.length > 0) {
+        // The API returns newest tokens first. Reuse the same phone number
+        // for repeat visits, but always start billing from the latest active token.
         selectCustomerToken(availableTokens[0]);
       } else if (availableTokens.length === 0) {
         setTokenMessage("No active tokens are available for this customer.");
@@ -346,7 +356,8 @@ function BillingPage() {
   };
 
   const lookupToken = async () => {
-    const normalizedTokenNumber = tokenNumber.trim().toUpperCase();
+    const digits = tokenNumber.trim().toUpperCase().replace(/^TK/, "").replace(/\D/g, "");
+    const normalizedTokenNumber = digits ? `TK${digits}` : "";
 
     if (!normalizedTokenNumber) {
       setTokenMessage("Enter a token number.");
@@ -434,7 +445,7 @@ function BillingPage() {
         local_id: `${die.id}-${Date.now()}`,
         die_id: die.id,
         die_code: die.die_code,
-        work_name: die.name,
+        work_name: formatDieNumber(die.name),
         price: money(die.rate),
         quantity: 1,
       },
@@ -452,15 +463,30 @@ function BillingPage() {
     setBillItems((current) => current.filter((item) => item.local_id !== localId));
   };
 
-  const printBill = (bill, printWindow) => {
+  const printBill = (bill, printWindow, profile = printConfig) => {
+    const targetWindow = printWindow || window.open("", "_blank", "width=420,height=900");
+
     const createdAt = new Date(bill.created_at);
-    const address = String(printConfig.address || "").replace(/\r?\n/g, "<br />");
-    const paperSize = printConfig.bill_paper_size === "58MM" ? "58mm" : "80mm";
+    const escapePrintText = (value) => String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+    const address = escapePrintText(profile.address || "").replace(/\r?\n/g, "<br />");
+    const paperSize = profile.bill_paper_size === "58MM" ? "58mm" : "80mm";
+    const shopName = escapePrintText(profile.shop_name || "NELLORE DIE CUTTING");
+    const phoneNumber = escapePrintText(profile.phone_number || "");
+    const billNumber = escapePrintText(bill.bill_number || "");
+    const customerName = escapePrintText(bill.customer_name || "NA");
+    const customerMobile = escapePrintText(bill.customer_mobile || "NA");
+    const tokenNumber = escapePrintText(bill.token_number || "NA");
+    const paymentMethod = escapePrintText(bill.payment_method || "");
     const rows = (bill.items || [])
       .map(
         (item) => `
           <tr>
-            <td>${item.die_code || ""}</td>
+            <td>${escapePrintText(formatDieNumber(item.work_name || item.die_code || ""))}</td>
             <td>${item.quantity || 0}</td>
             <td>${Number(item.rate || 0).toFixed(2)}</td>
             <td>${Number(item.amount || 0).toFixed(2)}</td>
@@ -468,10 +494,10 @@ function BillingPage() {
       )
       .join("");
 
-    if (!printWindow || printWindow.closed) return;
+    if (!targetWindow || targetWindow.closed) return false;
 
-    printWindow.document.open();
-    printWindow.document.write(`<!DOCTYPE html>
+    targetWindow.document.open();
+    targetWindow.document.write(`<!DOCTYPE html>
       <html>
         <head>
           <meta charset="UTF-8" />
@@ -480,63 +506,87 @@ function BillingPage() {
             @page { size: ${paperSize} auto; margin: 3mm; }
             * { box-sizing: border-box; font-family: Arial, sans-serif; }
             body { margin: 0; background: #fff; color: #000; }
-            .receipt { width: 72mm; margin: auto; padding: 8px; }
+            .receipt { width: 72mm; margin: auto; padding: 7px 4px; }
             .shop-name, .bill-title, .footer { text-align: center; }
-            .shop-name { font-size: 22px; font-weight: bold; }
-            .shop-address { text-align: center; font-size: 12px; line-height: 1.5; margin-top: 6px; }
-            .separator { border-top: 2px dashed #000; margin: 10px 0; }
-            .bill-title { font-size: 20px; font-weight: bold; margin: 10px 0; }
+            .shop-name { font-size: 24px; font-weight: 900; letter-spacing: .4px; }
+            .shop-address { text-align: center; font-size: 13px; line-height: 1.45; margin-top: 5px; }
+            .separator { border-top: 2px dashed #000; margin: 9px 0; }
+            .bill-title { font-size: 22px; font-weight: 900; margin: 8px 0; }
             .info, .items { width: 100%; border-collapse: collapse; }
-            .info td { padding: 3px 0; font-size: 13px; }
-            .items { margin-top: 10px; }
-            .items th, .items td { border: 1px solid #000; padding: 5px; font-size: 12px; text-align: center; }
-            .total { margin-top: 12px; font-size: 14px; }
-            .line { display: flex; justify-content: space-between; margin-top: 6px; }
-            .final-box { border: 2px solid #000; margin-top: 12px; padding: 10px; text-align: center; }
-            .final-label { font-size: 16px; font-weight: bold; }
-            .final-value { font-size: 30px; font-weight: bold; }
-            .footer { margin-top: 15px; font-size: 13px; }
+            .info td { padding: 3px 2px; font-size: 12px; vertical-align: top; }
+            .info .label { width: 25%; font-weight: 700; white-space: nowrap; }
+            .info .colon { width: 5%; text-align: center; }
+            .info .value { width: 20%; }
+            .info .right-label { width: 25%; font-weight: 700; white-space: nowrap; padding-left: 7px; }
+            .info .right-value { width: 25%; }
+            .items { margin-top: 9px; }
+            .items th, .items td { border: 1px solid #000; padding: 5px 3px; font-size: 11px; text-align: center; }
+            .items th { font-weight: 700; }
+            .total { margin-top: 9px; padding: 0 5px; font-size: 13px; }
+            .line { display: flex; justify-content: space-between; margin-top: 5px; }
+            .final-box { display: flex; align-items: center; justify-content: space-between; border: 2px solid #000; border-radius: 7px; margin-top: 10px; padding: 7px 10px; }
+            .final-label { font-size: 15px; font-weight: bold; }
+            .final-value { font-size: 27px; font-weight: 900; }
+            .gold-return-box { border: 2px solid #000; border-radius: 7px; margin-top: 9px; padding: 7px; text-align: center; }
+            .gold-return-label { font-size: 15px; font-weight: 900; }
+            .gold-return-value { font-size: 29px; font-weight: 900; }
+            .footer { margin-top: 11px; font-size: 13px; line-height: 1.45; }
           </style>
         </head>
         <body>
           <div class="receipt">
-            ${printConfig.show_bill_header ? `<div class="shop-name">${printConfig.shop_name || "NELLORE DIE CUTTING"}</div>
-            <div class="shop-address">${address}<br />Contact: ${printConfig.phone_number || ""}</div>` : ""}
+            ${profile.show_bill_header ? `<div class="shop-name">${shopName}</div>
+            <div class="shop-address">${address}<br />Contact : ${phoneNumber}</div>` : ""}
             <div class="separator"></div>
             <div class="bill-title">★ BILL ★</div>
             <div class="separator"></div>
             <table class="info">
-              <tr><td><b>Bill No</b></td><td>:</td><td>${bill.bill_number || ""}</td></tr>
-              <tr><td><b>Date</b></td><td>:</td><td>${createdAt.toLocaleDateString("en-IN")}</td></tr>
-              <tr><td><b>Time</b></td><td>:</td><td>${createdAt.toLocaleTimeString("en-IN")}</td></tr>
-              <tr><td><b>Mobile</b></td><td>:</td><td>${bill.customer_mobile || ""}</td></tr>
-              <tr><td><b>Token No</b></td><td>:</td><td>${bill.token_number || ""}</td></tr>
-              <tr><td><b>Payment</b></td><td>:</td><td>${bill.payment_method || ""}</td></tr>
-              <tr><td><b>Gold Return</b></td><td>:</td><td><b>${Number(bill.gold_return || 0).toFixed(3)} gm</b></td></tr>
+              <tr><td class="label">Bill No.</td><td class="colon">:</td><td class="value">${billNumber}</td><td class="right-label">Payment</td><td class="colon">:</td><td class="right-value">${paymentMethod}</td></tr>
+              <tr><td class="label">Date</td><td class="colon">:</td><td class="value">${createdAt.toLocaleDateString("en-IN")}</td><td class="right-label">Mobile</td><td class="colon">:</td><td class="right-value">${customerMobile}</td></tr>
+              <tr><td class="label">Time</td><td class="colon">:</td><td class="value">${createdAt.toLocaleTimeString("en-IN")}</td><td class="right-label">Gold Deposit</td><td class="colon">:</td><td class="right-value">${Number(bill.gold_deposit || 0).toFixed(3)} gm</td></tr>
+              <tr><td class="label">Customer</td><td class="colon">:</td><td class="value">${customerName}</td><td class="right-label">Token No.</td><td class="colon">:</td><td class="right-value">${tokenNumber}</td></tr>
             </table>
             <div class="separator"></div>
+            <div class="gold-return-box">
+              <div class="gold-return-label">GOLD RETURN</div>
+              <div class="gold-return-value">${Number(bill.gold_return || 0).toFixed(3)} gm</div>
+            </div>
             <table class="items">
               <thead><tr><th>Die</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>
             <div class="total">
               <div class="line"><span>Total Amount</span><b>₹ ${Number(bill.total_amount || 0).toFixed(2)}</b></div>
-              ${printConfig.show_discount ? `<div class="line"><span>Discount</span><b>₹ ${Number(bill.discount || 0).toFixed(2)}</b></div>` : ""}
+              ${profile.show_discount ? `<div class="line"><span>Discount</span><b>₹ ${Number(bill.discount || 0).toFixed(2)}</b></div>` : ""}
             </div>
             <div class="final-box">
               <div class="final-label">FINAL AMOUNT</div>
               <div class="final-value">₹ ${Number(bill.final_amount || 0).toFixed(2)}</div>
             </div>
-            ${printConfig.show_bill_footer ? `<div class="separator"></div><div class="footer">Thank You! Visit Again.<br />Please keep this bill safely.</div>` : ""}
+            ${profile.show_bill_footer ? `<div class="separator"></div><div class="footer">Thank You! Visit Again.<br />Please keep this bill safely.</div>` : ""}
           </div>
+          <script>
+            window.addEventListener("load", function () {
+              window.focus();
+              window.print();
+              setTimeout(function () { window.close(); }, 700);
+            });
+          </script>
         </body>
       </html>`);
-    printWindow.onload = () => {
-      printWindow.focus();
-      printWindow.print();
-      setTimeout(() => printWindow.close(), 500);
+    let printStarted = false;
+    const startPrint = () => {
+      if (printStarted || targetWindow.closed) return;
+      printStarted = true;
+      targetWindow.focus();
+      targetWindow.print();
+      setTimeout(() => targetWindow.close(), 500);
     };
-    printWindow.document.close();
+    targetWindow.onload = startPrint;
+    targetWindow.document.close();
+    // Some mobile browsers do not dispatch onload for document.write pages.
+    setTimeout(startPrint, 350);
+    return true;
   };
 
   const createBillAndPrint = async () => {
@@ -605,17 +655,15 @@ function BillingPage() {
       return;
     }
 
-    // Open the print window while still inside the button click event.
-    // Browsers may block a new window opened after the API request resolves.
+    // Open during the user's click so mobile browsers do not block the
+    // print window after the bill API request completes.
     const printWindow = window.open("", "_blank", "width=420,height=900");
-
     if (!printWindow) {
-      setError("Printing was blocked by the browser. Please allow pop-ups and try again.");
+      setError("Printing was blocked by the browser. Please allow pop-ups for this site and try again.");
       setErrorType("error");
       return;
     }
-
-    printWindow.document.write("<p style='font-family: Arial'>Creating bill...</p>");
+    printWindow.document.write("<p style=\"font-family:Arial;padding:20px\">Preparing bill...</p>");
 
     setSaving(true);
 
@@ -633,17 +681,34 @@ function BillingPage() {
         remarks: "",
       };
 
-      const bill = await createBill(payload);
+      const [bill, latestPrintConfig] = await Promise.all([
+        createBill(payload),
+        getBillingProfile().catch(() => printConfig),
+      ]);
+      setPrintConfig((current) => ({ ...current, ...(latestPrintConfig || {}) }));
       setCreatedBill(bill);
-      setMessage(`Bill created successfully: ${ bill.bill_number } `);
+      const printed = printBill(bill, printWindow, latestPrintConfig);
+      setMessage(
+        printed
+          ? `Bill created successfully: ${bill.bill_number}`
+          : `Bill created successfully: ${bill.bill_number}. Allow pop-ups to print it.`
+      );
       setMessageType("success");
-      printBill(bill, printWindow);
     } catch (err) {
-      if (!printWindow.closed) printWindow.close();
+      if (printWindow && !printWindow.closed) printWindow.close();
       setError(formatError(err));
       setErrorType("error");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const printCreatedBill = () => {
+    if (!createdBill) return;
+
+    if (!printBill(createdBill)) {
+      setError("Printing was blocked by the browser. Please allow pop-ups and try again.");
+      setErrorType("error");
     }
   };
 
@@ -747,17 +812,18 @@ function BillingPage() {
               <div className="billing-input-group">
                 <div className="billing-input-wrapper">
                   <FaTag className="input-icon" />
+                  <span className="token-number-prefix" aria-hidden="true">TK</span>
                   <input
                     type="text"
                     list="customer-token-numbers"
-                    placeholder="Enter token number"
-                    value={tokenNumber}
+                    placeholder="Enter number (e.g. 009)"
+                    value={tokenNumber.replace(/^TK-?/i, "")}
                     onChange={handleTokenNumberChange}
                     onKeyDown={(event) => event.key === "Enter" && lookupToken()}
                   />
                   <datalist id="customer-token-numbers">
                     {customerTokens.map((token) => (
-                      <option key={token.id} value={token.token_number}>
+                      <option key={token.id} value={token.token_number.replace(/^TK-?/i, "").replace(/\D/g, "")}>
                         {token.token_number} - {Number(token.remaining_gold || 0).toFixed(3)} gm remaining
                       </option>
                     ))}
@@ -837,11 +903,10 @@ function BillingPage() {
                         className={`billing-die-button ${itemInBill ? "selected" : ""}`}
                         style={{ backgroundColor: getDieColor(die, index) }}
                         onClick={() => addBillItem(die)}
-                        title={`${die.die_code} - ${die.name} - ${die.rate}`}
-                        aria-label={`Add ${die.die_code}, ${die.name}`}
+                        title={`${formatDieNumber(die.name)} - Rs ${Number(die.rate).toFixed(2)}`}
+                        aria-label={`Add ${formatDieNumber(die.name)}`}
                       >
-                        <span className="die-label">{die.die_code}</span>
-                        <span className="die-work-name">{die.name}</span>
+                        <span className="die-work-name">{formatDieNumber(die.name)}</span>
                         <span className="die-price">Rs {Number(die.rate).toFixed(2)}</span>
                         {itemInBill && <span className="die-quantity-badge">×{itemInBill.quantity}</span>}
                       </button>
@@ -1008,7 +1073,7 @@ function BillingPage() {
 
                   {billItems.map((item) => (
                     <div key={item.local_id} className="billing-table-row">
-                      <div className="col-die-no">{item.die_code}</div>
+                      <div className="col-die-no">{formatDieNumber(item.work_name || item.die_code)}</div>
 
                       <div className="col-qty">
                         <button
@@ -1127,7 +1192,7 @@ function BillingPage() {
                 <button
                   type="button"
                   className="btn-billing-print"
-                  onClick={createdBill ? () => printBill(createdBill) : createBillAndPrint}
+                  onClick={createdBill ? printCreatedBill : createBillAndPrint}
                   disabled={saving}
                 >
                   {saving ? "Saving..." : <><FaPrint /> PRINT BILL</>}

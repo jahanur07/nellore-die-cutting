@@ -50,3 +50,10 @@ export const importDiePrices = async (file) => {
   });
   return response.data;
 };
+
+export const downloadDiePriceTemplate = async () => {
+  const response = await api.get("/masters/die-prices/template/", {
+    responseType: "blob",
+  });
+  return response.data;
+};

@@ -34,6 +34,7 @@ class SystemSettingsSerializer(serializers.ModelSerializer):
             "whatsapp_daily_summary",
             "backup_reminder",
             "bill_print_sound",
+            "allow_token_edit",
             "auto_logout_minutes",
             "entries_per_page",
             "theme_mode",

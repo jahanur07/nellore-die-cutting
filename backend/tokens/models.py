@@ -62,7 +62,7 @@ class Token(models.Model):
             except Exception:
                 prefix = "TK"
 
-            self.token_number = f"{prefix}-{next_number:04d}"
+            self.token_number = f"{prefix}{next_number:03d}"
 
         super().save(*args, **kwargs)
 

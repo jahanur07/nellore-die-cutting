@@ -51,9 +51,7 @@ class DiePrice(models.Model):
             else:
                 next_number = 1
 
-            self.die_code = (
-                f"DIE-{next_number:04d}"
-            )
+            self.die_code = f"SL{next_number:03d}"
 
         super().save(*args, **kwargs)
 

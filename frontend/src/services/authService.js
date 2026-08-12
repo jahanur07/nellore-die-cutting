@@ -1,5 +1,7 @@
 import api from "./api";
 
+export const SESSION_DURATION_MS = 5 * 60 * 60 * 1000;
+
 // Send username and password to the backend login endpoint.
 // Returns access token, refresh token, and user info on success.
 export const loginUser = async (username, password) => {
@@ -50,11 +52,21 @@ export const logoutUser = () => {
   localStorage.removeItem("accessToken");
   localStorage.removeItem("staffToken");
   localStorage.removeItem("refreshToken");
+  localStorage.removeItem("sessionExpiresAt");
   localStorage.removeItem("user");
 };
 
 // Check if a token exists in localStorage.
 // Used by ProtectedRoute to decide if the page can be shown.
 export const isAuthenticated = () => {
-  return Boolean(localStorage.getItem("accessToken") || localStorage.getItem("staffToken"));
+  const token = localStorage.getItem("accessToken") || localStorage.getItem("staffToken");
+  const expiresAt = Number(localStorage.getItem("sessionExpiresAt") || 0);
+
+  if (!token) return false;
+  if (expiresAt && Date.now() >= expiresAt) {
+    logoutUser();
+    return false;
+  }
+
+  return true;
 };

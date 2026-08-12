@@ -89,6 +89,7 @@ class BillingProfileView(APIView):
 			"show_bill_footer": settings_obj.show_bill_footer,
 			"show_discount": settings_obj.show_discount,
 			"bill_print_sound": settings_obj.bill_print_sound,
+			"allow_token_edit": settings_obj.allow_token_edit,
 			"currency": settings_obj.currency,
 			"amount_decimal_places": settings_obj.amount_decimal_places,
 		})
@@ -147,6 +148,7 @@ class WeighingMachineConfigView(APIView):
 				"machine_read_timeout_ms": settings_obj.machine_read_timeout_ms,
 				"machine_stable_read_count": settings_obj.machine_stable_read_count,
 				"allow_manual_weight_entry": settings_obj.allow_manual_weight_entry,
+				"allow_token_edit": settings_obj.allow_token_edit,
 				"weight_decimal_places": settings_obj.weight_decimal_places,
 				"weight_unit": settings_obj.weight_unit,
 			}
