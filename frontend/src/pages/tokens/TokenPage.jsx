@@ -4,6 +4,7 @@ import {
   FaCalendarAlt,
   FaCheck,
   FaClock,
+  FaFileInvoice,
   FaInfo,
   FaLock,
   FaLockOpen,
@@ -21,6 +22,7 @@ import Sidebar from "../../components/layout/Sidebar";
 import useWeighingMachine from "../../hooks/useWeighingMachine";
 import { getBusinessProfile, getWeighingMachineConfig } from "../../services/settingsService";
 import { createToken, getTokens, updateToken } from "../../services/tokenService";
+import { getBills } from "../../services/billingService";
 
 const DEFAULT_BUSINESS_PROFILE = {
   shop_name: "Nellore Die Cutting",
@@ -549,6 +551,24 @@ function TokenPage() {
     }
   };
 
+  const handleEditLatestBill = async (token) => {
+    if (!isAdmin) return;
+
+    setError("");
+    try {
+      const bills = await getBills(token.token_number);
+      if (!bills.length) {
+        setError(`No bill has been created for ${token.token_number} yet.`);
+        setErrorType("error");
+        return;
+      }
+      navigate(`/billing?editBill=${bills[0].id}`);
+    } catch {
+      setError("Unable to load the bill for this token.");
+      setErrorType("error");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
@@ -665,6 +685,7 @@ function TokenPage() {
         {/* PAGE TITLE */}
         <div className="page-title-section">
           <h1 className="page-title">Token / Gold Deposit</h1>
+          <p className="page-subtitle">Record customer gold securely and generate a traceable deposit token.</p>
         </div>
 
         {/* MAIN CONTAINER */}
@@ -981,6 +1002,7 @@ function TokenPage() {
                   <span className="recent-weight">{Number(token.gold_weight).toFixed(3)} gm</span>
                   <div className="recent-token-actions">
                     <button type="button" title="Print token" onClick={() => handlePrintExistingToken(token)}><FaPrint /></button>
+                    {isAdmin && <button type="button" className="recent-bill-edit-action" title="Edit or reprint latest bill" onClick={() => handleEditLatestBill(token)}><FaFileInvoice /></button>}
                     <button type="button" title={tokenEditAllowed ? "Edit token" : "Token editing disabled by admin"} disabled={!tokenEditAllowed} onClick={() => handleEditToken(token)}><FaPencilAlt /></button>
                   </div>
                 </div>

@@ -13,11 +13,15 @@ const PARITY_MAP = {
 };
 
 // Digital weighing scales commonly stream ASCII lines such as
-// "ST,GS,+00012.345,g" or "US,GS,-0003.20,kg" or plain "12.345".
-// Pull out the first signed decimal number in the line.
+// "ST,GS,+00012.345,g", MT-SICS "S S      0.180 g", or plain "12.345".
+// Return grams because the application stores all weights in grams.
 const extractWeight = (line) => {
-  const match = String(line).match(/-?\d+(\.\d+)?/);
-  return match ? Number.parseFloat(match[0]) : null;
+  const text = String(line).trim();
+  const match = text.match(/[+-]?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const value = Number.parseFloat(match[0]);
+  if (!Number.isFinite(value)) return null;
+  return /(?:^|[\s,])kg(?:$|[\s,])/i.test(text) ? value * 1000 : value;
 };
 
 // Reads live weight from a serial weighing machine using the Web Serial API.
@@ -40,6 +44,8 @@ export default function useWeighingMachine({
 
   const portRef = useRef(null);
   const readerRef = useRef(null);
+  const writerRef = useRef(null);
+  const pollTimerRef = useRef(null);
   const keepReadingRef = useRef(false);
   const bufferRef = useRef([]);
   const watchdogRef = useRef(null);
@@ -60,9 +66,25 @@ export default function useWeighingMachine({
     }, Math.max(readTimeoutMs, 500) * 4);
   }, [clearWatchdog, readTimeoutMs]);
 
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    if (writerRef.current) {
+      try {
+        writerRef.current.releaseLock();
+      } catch {
+        // ignore
+      }
+      writerRef.current = null;
+    }
+  }, []);
+
   const stopReading = useCallback(async () => {
     keepReadingRef.current = false;
     clearWatchdog();
+    stopPolling();
 
     if (readerRef.current) {
       try {
@@ -77,7 +99,7 @@ export default function useWeighingMachine({
       }
       readerRef.current = null;
     }
-  }, [clearWatchdog]);
+  }, [clearWatchdog, stopPolling]);
 
   const disconnect = useCallback(async () => {
     await stopReading();
@@ -187,6 +209,23 @@ export default function useWeighingMachine({
       setStatus("connected");
 
       readLoop(port);
+
+      // The JE3002GE commonly waits for an MT-SICS host request. Listening
+      // only for unsolicited output leaves the port open but produces no
+      // weight, which is the client's reported "Connected / No signal" case.
+      if (port.writable) {
+        const writer = port.writable.getWriter();
+        writerRef.current = writer;
+        const requestWeight = async () => {
+          try {
+            await writer.write(new TextEncoder().encode("SI\r\n"));
+          } catch {
+            // The read loop will surface a connection error if the port closes.
+          }
+        };
+        await requestWeight();
+        pollTimerRef.current = setInterval(requestWeight, 1000);
+      }
     } catch (err) {
       if (err?.name === "NotFoundError") {
         // User closed the "select a port" dialog without choosing one.

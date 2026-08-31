@@ -7,13 +7,16 @@ import {
   FaDownload,
   FaEnvelope,
   FaFileInvoice,
+  FaInfo,
   FaLock,
   FaPhone,
+  FaPlug,
   FaPrint,
   FaRupeeSign,
   FaStore,
   FaSync,
   FaTools,
+  FaTrash,
   FaUpload,
   FaUserShield,
   FaUserPlus,
@@ -30,7 +33,7 @@ import {
   updateSettings,
   uploadLogo,
 } from "../../services/settingsService";
-import { createUser, getUsers, updateUser } from "../../services/userService";
+import { createUser, deleteUser, getUsers, updateUser } from "../../services/userService";
 
 const TABS = [
   { key: "shop", label: "Shop Information", icon: <FaStore /> },
@@ -82,6 +85,8 @@ const DEFAULT_SETTINGS = {
   allow_manual_weight_entry: true,
 };
 
+const getUserInitials = (username = "") => username.trim().slice(0, 2).toUpperCase() || "U";
+
 function Toggle({ checked, disabled, onChange }) {
   return (
     <button
@@ -95,10 +100,10 @@ function Toggle({ checked, disabled, onChange }) {
   );
 }
 
-function SettingsPage() {
+function SettingsPage({ initialTab = "shop" }) {
   const navigate = useNavigate();
 
-  const [activeTab, setActiveTab] = useState("shop");
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -305,6 +310,26 @@ function SettingsPage() {
     }
   };
 
+  const handleDeleteUser = async (user) => {
+    if (disabled) return;
+
+    const confirmed = window.confirm(
+      `Delete user "${user.username}" permanently? This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    setError("");
+    setSuccess("");
+    try {
+      await deleteUser(user.id);
+      setUsers((current) => current.filter((item) => item.id !== user.id));
+      setSuccess(`${user.username} deleted successfully.`);
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      setError(detail || "Unable to delete user.");
+    }
+  };
+
   const handleBackup = async () => {
     setBackupLoading(true);
     setError("");
@@ -419,12 +444,19 @@ function SettingsPage() {
 
   const renderBillSettings = () => (
     <>
-      <section className="settings-system-grid">
-        <article className="settings-card print-settings">
-          <h3>CREATE BILL & PRINT SETTINGS</h3>
+      <section className="settings-bill-layout">
+        <article className="settings-card settings-bill-card">
+          <div className="settings-section-heading">
+            <div>
+              <h3><FaFileInvoice /> BILL CONFIGURATION</h3>
+              <p>Choose defaults used when creating new bills.</p>
+            </div>
+            <span className="settings-heading-icon bill"><FaRupeeSign /></span>
+          </div>
           <div className="settings-form-grid two-col">
             <div className="settings-field">
               <label>Default Payment Mode</label>
+              <small>Preselected on every new bill.</small>
               <select value={formData.default_payment_mode} onChange={(e) => updateField("default_payment_mode", e.target.value)} disabled={disabled}>
                 <option value="CASH">Cash</option>
                 <option value="ONLINE">Online</option>
@@ -432,6 +464,7 @@ function SettingsPage() {
             </div>
             <div className="settings-field">
               <label>Bill Paper Size</label>
+              <small>Thermal printer roll width.</small>
               <select value={formData.bill_paper_size} onChange={(e) => updateField("bill_paper_size", e.target.value)} disabled={disabled}>
                 <option value="80MM">80mm Thermal</option>
                 <option value="58MM">58mm Thermal</option>
@@ -439,14 +472,26 @@ function SettingsPage() {
             </div>
             <div className="settings-field">
               <label>Bill Prefix</label>
+              <small>Example: BILL-0001</small>
               <input value={formData.bill_prefix} onChange={(e) => updateField("bill_prefix", e.target.value.toUpperCase())} maxLength="10" disabled={disabled} />
             </div>
             <div className="settings-field">
               <label>Amount Decimal Places</label>
+              <small>Precision for prices and totals.</small>
               <select value={formData.amount_decimal_places} onChange={(e) => updateField("amount_decimal_places", Number(e.target.value))} disabled={disabled}>
                 <option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
               </select>
             </div>
+          </div>
+        </article>
+
+        <article className="settings-card settings-print-card">
+          <div className="settings-section-heading">
+            <div>
+              <h3><FaPrint /> PRINT OPTIONS</h3>
+              <p>Control what customers see on printed receipts.</p>
+            </div>
+            <span className="settings-heading-icon print"><FaPrint /></span>
           </div>
           {[
             ["show_discount", "Show Discount", "Show the discount row while creating and printing bills."],
@@ -454,11 +499,30 @@ function SettingsPage() {
             ["show_bill_footer", "Print Bill Footer", "Show the thank-you message on receipts."],
             ["bill_print_sound", "Bill Print Sound", "Play the browser print sound preference after billing."],
           ].map(([key, label, help]) => (
-            <div className="setting-row" key={key}>
+            <div className="setting-row settings-print-option" key={key}>
               <div><p>{label}</p><small>{help}</small></div>
               <Toggle checked={Boolean(formData[key])} disabled={disabled} onChange={(next) => updateField(key, next)} />
             </div>
           ))}
+        </article>
+
+        <article className="settings-card settings-receipt-preview-card">
+          <div className="settings-section-heading">
+            <div>
+              <h3>RECEIPT PREVIEW</h3>
+              <p>A quick look at your current bill format.</p>
+            </div>
+            <span className="settings-preview-paper">{formData.bill_paper_size}</span>
+          </div>
+          <div className="settings-receipt-preview">
+            {formData.show_bill_header && <><strong>{formData.shop_name || "NELLORE DIE CUTTING"}</strong><small>{formData.address || "Jewellery Die Cutting"}</small><span className="settings-preview-rule" /></>}
+            <div className="settings-preview-line"><span>{formData.bill_prefix || "BILL"}-0001</span><span>Today</span></div>
+            <div className="settings-preview-item"><span>Gold Die Cutting</span><b>₹ 1,250.00</b></div>
+            {formData.show_discount && <div className="settings-preview-item muted"><span>Discount</span><b>- ₹ 50.00</b></div>}
+            <span className="settings-preview-rule" />
+            <div className="settings-preview-total"><span>Total</span><strong>₹ 1,200.00</strong></div>
+            {formData.show_bill_footer && <small className="settings-preview-thanks">Thank you for your business</small>}
+          </div>
         </article>
       </section>
       {renderActions()}
@@ -468,24 +532,43 @@ function SettingsPage() {
   const renderUsers = () => (
     <section className="settings-users-grid">
       <article className="settings-card">
-        <h3><FaUserPlus /> ADD USER</h3>
+        <div className="settings-section-heading">
+          <div>
+            <h3><FaUserPlus /> ADD USER</h3>
+            <p>Create staff access with a secure four-digit MPIN.</p>
+          </div>
+          <span className="settings-heading-icon"><FaUserPlus /></span>
+        </div>
         <form className="settings-form-grid two-col" onSubmit={handleCreateUser}>
           <div className="settings-field"><label>Username</label><input required value={userForm.username} onChange={(e) => setUserForm({ ...userForm, username: e.target.value })} disabled={disabled} /></div>
           <div className="settings-field"><label>Email</label><input type="email" value={userForm.email} onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} disabled={disabled} /></div>
           <div className="settings-field"><label>Staff MPIN (4 digits)</label><input required minLength="4" maxLength="4" inputMode="numeric" type="password" value={userForm.mpin} onChange={(e) => setUserForm({ ...userForm, mpin: e.target.value.replace(/\D/g, "").slice(0, 4) })} disabled={disabled} /></div>
           <div className="settings-field"><label>Role</label><select value={userForm.role} onChange={(e) => setUserForm({ ...userForm, role: e.target.value })} disabled={disabled}><option value="STAFF">Staff</option><option value="ADMIN">Administrator</option></select></div>
           <div className="settings-field"><label>Department</label><input value={userForm.department} onChange={(e) => setUserForm({ ...userForm, department: e.target.value })} disabled={disabled} /></div>
-          <button className="settings-primary-action" type="submit" disabled={disabled || userSaving}>{userSaving ? "Creating..." : "Create User"}</button>
+          <button className="settings-primary-action" type="submit" disabled={disabled || userSaving}><FaUserPlus />{userSaving ? "Creating..." : "Create User"}</button>
         </form>
       </article>
       <article className="settings-card">
-        <h3><FaUserShield /> USERS & ROLES</h3>
+        <div className="settings-section-heading users-heading">
+          <div>
+            <h3><FaUserShield /> USERS & ROLES</h3>
+            <p>Manage access, roles, and account status.</p>
+          </div>
+          <span className="settings-user-count">{users.length} {users.length === 1 ? "user" : "users"}</span>
+        </div>
         <div className="settings-user-list">
           {users.map((user) => (
             <div className="settings-user-row" key={user.id}>
-              <div><strong>{user.username}</strong><small>{user.email || "No email"} · {user.department || "General"}</small></div>
-              <span className={`settings-role-badge ${user.role === "ADMIN" ? "admin" : "staff"}`}>{user.role === "ADMIN" ? "Administrator" : "Staff"}</span>
-              <button type="button" className="settings-refresh-action" onClick={() => toggleUser(user)} disabled={disabled || user.id === JSON.parse(localStorage.getItem("user") || "null")?.id}>{user.is_active ? "Deactivate" : "Activate"}</button>
+              <span className={`settings-user-avatar ${user.role === "ADMIN" ? "admin" : "staff"}`}>{getUserInitials(user.username)}</span>
+              <div className="settings-user-details"><strong>{user.username}</strong><small>{user.email || "No email"} <span>•</span> {user.department || "General"}</small></div>
+              <div className="settings-user-meta">
+                <span className={`settings-role-badge ${user.role === "ADMIN" ? "admin" : "staff"}`}>{user.role === "ADMIN" ? "Administrator" : "Staff"}</span>
+                <span className={`settings-status-badge ${user.is_active ? "active" : "inactive"}`}><span />{user.is_active ? "Active" : "Inactive"}</span>
+              </div>
+              <div className="settings-user-actions">
+                <button type="button" className="settings-refresh-action" onClick={() => toggleUser(user)} disabled={disabled || user.id === JSON.parse(localStorage.getItem("user") || "null")?.id}>{user.is_active ? "Deactivate" : "Activate"}</button>
+                <button type="button" className="settings-delete-action" onClick={() => handleDeleteUser(user)} disabled={disabled || user.id === JSON.parse(localStorage.getItem("user") || "null")?.id} title="Delete user" aria-label={`Delete ${user.username}`}><FaTrash /></button>
+              </div>
             </div>
           ))}
           {users.length === 0 && <p className="settings-empty-note">No users found.</p>}
@@ -1267,7 +1350,15 @@ function SettingsPage() {
           <>
             <section className="settings-system-grid settings-machine-grid">
               <article className="settings-card settings-machine-card">
-                <h3>WEIGHING MACHINE SETTINGS</h3>
+                <div className="settings-section-heading machine-heading">
+                  <div>
+                    <h3><FaTools /> WEIGHING MACHINE</h3>
+                    <p>Configure the serial scale used to capture gold return weight.</p>
+                  </div>
+                  <span className={`settings-machine-status ${formData.weighing_machine_enabled ? "enabled" : "disabled"}`}>
+                    <span /> {formData.weighing_machine_enabled ? "Enabled" : "Disabled"}
+                  </span>
+                </div>
 
                 <div className="setting-row business-discount-row">
                   <div>
@@ -1283,10 +1374,10 @@ function SettingsPage() {
 
                 <div className="settings-form-grid two-col settings-machine-form">
                   <div className="settings-field">
-                    <label>Machine Port</label>
+                    <label>Adapter Reference / Port</label>
                     <input
                       type="text"
-                      placeholder="e.g. /dev/ttyUSB0 or COM3"
+                      placeholder="e.g. BAFO BF-810 or COM3"
                       value={formData.machine_port}
                       onChange={(event) => updateField("machine_port", event.target.value)}
                       disabled={disabled}
@@ -1381,7 +1472,22 @@ function SettingsPage() {
                 </div>
 
                 <div className="settings-machine-note">
-                  <p>Connection status is not simulated here. This section stores configuration only.</p>
+                  <FaInfo />
+                  <p><strong>Client setup detected:</strong> Mettler Toledo JE3002GE via BAFO BF-810 USB-to-RS-232.
+                    Use MT-SICS / 9600 baud / 8 data bits / no parity / 1 stop bit. Save these settings, then
+                    connect the scale from Billing or Token. The browser will ask you to select the adapter;
+                    the typed port name is for reference only.</p>
+                </div>
+
+                <div className="settings-machine-tip-grid">
+                  <div>
+                    <strong><FaPlug /> Connection</strong>
+                    <small>Use Chrome or Edge on localhost for Web Serial access.</small>
+                  </div>
+                  <div>
+                    <strong><FaWeight /> Stable readings</strong>
+                    <small>Increase Stable Read Count if the scale fluctuates.</small>
+                  </div>
                 </div>
               </article>
             </section>

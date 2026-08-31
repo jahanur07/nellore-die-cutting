@@ -16,8 +16,10 @@ from masters.models import DiePrice
 class BillItemSerializer(serializers.ModelSerializer):
 
     die_price = serializers.PrimaryKeyRelatedField(
-        queryset=DiePrice.objects.filter(is_active=True),
-        write_only=True,
+        # Existing bills must remain editable even if their die/work was
+        # later disabled in the master list. New billing still only displays
+        # active die/work entries in the frontend.
+        queryset=DiePrice.objects.all(),
     )
 
     class Meta:
@@ -174,6 +176,11 @@ class BillSerializer(serializers.ModelSerializer):
         # -----------------------------------------
         # Token must belong to customer
         # -----------------------------------------
+
+        if not self.instance and token and Bill.objects.filter(token=token).exists():
+            raise serializers.ValidationError({
+                "token": "A bill already exists for this token. You can reprint or edit the existing bill."
+            })
 
         if token and customer:
 
@@ -409,3 +416,51 @@ class BillSerializer(serializers.ModelSerializer):
 
 
         return bill
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        items_data = validated_data.pop("items", None)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+
+        if items_data is None:
+            items_data = [
+                {"die_price": item.die_price, "quantity": item.quantity}
+                for item in instance.items.select_related("die_price")
+            ]
+
+        total_amount = Decimal("0.00")
+        prepared_items = []
+
+        for item_data in items_data:
+            die_price = item_data["die_price"]
+            quantity = item_data.get("quantity", 1)
+            rate = die_price.rate
+            item_amount = rate * quantity
+            total_amount += item_amount
+            prepared_items.append({
+                "die_price": die_price,
+                "die_code": die_price.die_code,
+                "work_name": die_price.name,
+                "rate": rate,
+                "quantity": quantity,
+                "amount": item_amount,
+            })
+
+        discount = instance.discount or Decimal("0.00")
+        if discount > total_amount:
+            raise serializers.ValidationError({
+                "discount": "Discount cannot be greater than total amount."
+            })
+
+        instance.total_amount = total_amount
+        instance.final_amount = total_amount - discount
+        instance.save()
+
+        instance.items.all().delete()
+        BillItem.objects.bulk_create([
+            BillItem(bill=instance, **item) for item in prepared_items
+        ])
+
+        return instance

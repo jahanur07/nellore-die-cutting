@@ -1,12 +1,7 @@
 import axios from "axios";
 
-const SESSION_DURATION_MS = 5 * 60 * 60 * 1000;
-
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
+    baseURL: import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api",
 });
 
 api.interceptors.request.use(
@@ -28,7 +23,7 @@ export const setAuthToken = (token) => {
   if (token) {
     localStorage.setItem("accessToken", token);
     localStorage.setItem("staffToken", token);
-    localStorage.setItem("sessionExpiresAt", String(Date.now() + SESSION_DURATION_MS));
+    localStorage.removeItem("sessionExpiresAt");
   } else {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("staffToken");

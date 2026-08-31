@@ -6,6 +6,12 @@ import sys
 
 def main():
     """Run administrative tasks."""
+    # ``settings.py`` keeps production secure by default.  The development
+    # server, however, is normally started without any environment variables;
+    # mark that command as local before Django imports the settings module.
+    if len(sys.argv) > 1 and sys.argv[1] == "runserver":
+        os.environ.setdefault("DJANGO_LOCAL", "true")
+
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings")
     try:
         from django.core.management import execute_from_command_line

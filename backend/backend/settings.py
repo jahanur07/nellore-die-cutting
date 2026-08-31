@@ -4,20 +4,26 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+LOCAL_DEVELOPMENT = os.getenv("DJANGO_LOCAL", "").lower() in {"1", "true", "yes"}
+
 # -----------------------------------------------------------------------------
 # Security
 # -----------------------------------------------------------------------------
 
-SECRET_KEY = "django-insecure-your-long-secret-key"
+SECRET_KEY = "r-!v@sfj!h6u!b0)@c_e6gk9=+e*1!)tc1iz2ilk2je5!-8=5p"
 
-DEBUG = False
+DEBUG = LOCAL_DEVELOPMENT
 
 ALLOWED_HOSTS = [
-    "nellorediecutting.shop",
-    "www.nellorediecutting.shop",
+    "api.editkaro.com",
+    "www.api.editkaro.com",
     "localhost",
     "127.0.0.1",
 ]
+
+SECURE_SSL_REDIRECT = not LOCAL_DEVELOPMENT
+SESSION_COOKIE_SECURE = not LOCAL_DEVELOPMENT
+CSRF_COOKIE_SECURE = not LOCAL_DEVELOPMENT
 
 # -----------------------------------------------------------------------------
 # Applications
@@ -143,17 +149,15 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    # Keep a logged-in counter session usable during the working day.
-    # The frontend also tracks this deadline and redirects cleanly when it expires.
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=5),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": timedelta(days=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=365),
 }
 
 # -----------------------------------------------------------------------------
 # Frontend URL
 # -----------------------------------------------------------------------------
 
-FRONTEND_URL = "https://nellore-die-cutting-rho.vercel.app"
+FRONTEND_URL = "https://editkaro.com"
 
 # -----------------------------------------------------------------------------
 # Email
@@ -174,15 +178,28 @@ EMAIL_USE_TLS = True
 # -----------------------------------------------------------------------------
 
 CORS_ALLOWED_ORIGINS = [
-    "https://nellore-die-cutting.vercel.app",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:5174",
-    "http://127.0.0.1:5174",
+    "https://editkaro.com",
+    "https://www.editkaro.com",
 ]
 
-CORS_ALLOW_CREDENTIALS = True
+if LOCAL_DEVELOPMENT:
+    CORS_ALLOWED_ORIGINS += [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://editkaro.com",
+    "https://www.editkaro.com",
+]
+
+if LOCAL_DEVELOPMENT:
+    CSRF_TRUSTED_ORIGINS += [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]
+
+CORS_ALLOW_CREDENTIALS = True
 # -----------------------------------------------------------------------------
 # Default primary key field type
 # -----------------------------------------------------------------------------

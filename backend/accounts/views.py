@@ -7,6 +7,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.db import transaction
+from django.db.models import ProtectedError
 from django.utils import timezone
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
@@ -225,6 +226,40 @@ class ManagedUserDetailView(APIView):
             staff.save(update_fields=["mpin_hash"])
 
         return Response(ManagedUserSerializer(user).data)
+
+    def delete(self, request, pk):
+        if not request.user.is_superuser:
+            return Response(
+                {"detail": "Administrator access is required."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if request.user.pk == pk:
+            return Response(
+                {"detail": "You cannot delete your own administrator account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user_model = get_user_model()
+        try:
+            user = user_model.objects.get(pk=pk)
+        except user_model.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        try:
+            user.delete()
+        except ProtectedError:
+            return Response(
+                {
+                    "detail": (
+                        "This user has existing business records and cannot be deleted. "
+                        "Deactivate the user instead."
+                    )
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        return Response(status=status.HTTP_204_NO_CONTENT)
         
 class DashboardView(APIView):
 

@@ -109,6 +109,15 @@ function App() {
         />
 
         <Route
+          path="/machine-settings"
+          element={
+            <ProtectedRoute requireAdmin>
+              <SettingsPage initialTab="machine" />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
           path="/masters"
           element={
             <ProtectedRoute requireAdmin>

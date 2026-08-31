@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FaArrowLeft,
   FaCalendarAlt,
@@ -17,11 +17,11 @@ import {
   FaTrash,
   FaWeight,
 } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import Sidebar from "../../components/layout/Sidebar";
 import useWeighingMachine from "../../hooks/useWeighingMachine";
-import { createBill } from "../../services/billingService";
+import { createBill, getBillById, getBills, updateBill } from "../../services/billingService";
 import { getCustomerByMobile } from "../../services/customerService";
 import { getDiePrices } from "../../services/masterService";
 import { getBillingProfile, getWeighingMachineConfig } from "../../services/settingsService";
@@ -69,7 +69,7 @@ const PALETTE = [
 
 function BillingPage() {
   const navigate = useNavigate();
-  const dieGridRef = useRef(null);
+  const [searchParams] = useSearchParams();
 
   const [customerMobile, setCustomerMobile] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -114,6 +114,9 @@ function BillingPage() {
   const [tokenMessageType, setTokenMessageType] = useState("");
 
   const [createdBill, setCreatedBill] = useState(null);
+  const [billLocked, setBillLocked] = useState(false);
+  const [editingBill, setEditingBill] = useState(null);
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     const loadDies = async () => {
@@ -128,6 +131,61 @@ function BillingPage() {
 
     loadDies();
   }, []);
+
+  useEffect(() => {
+    const billId = searchParams.get("editBill");
+    if (!billId) return;
+
+    let active = true;
+    const loadBillForEditing = async () => {
+      setEditLoading(true);
+      setError("");
+      try {
+        const bill = await getBillById(billId);
+        const customer = await getCustomerByMobile(bill.customer_mobile);
+        const tokens = await getCustomerTokens(customer.id);
+        const token = tokens.find((item) => item.id === bill.token);
+
+        if (!active) return;
+        if (!token) {
+          throw new Error("The bill token could not be loaded.");
+        }
+
+        setEditingBill(bill);
+        setCustomerMobile(customer.mobile);
+        setSelectedCustomer(customer);
+        setCustomerTokens(tokens);
+        setSelectedToken(token);
+        setTokenNumber(token.token_number);
+        setGoldReturnWeight(String(bill.gold_return || ""));
+        setManualWeight(String(bill.gold_return || ""));
+        setBillItems((bill.items || []).map((item) => ({
+          local_id: `existing-${item.id}`,
+          die_id: item.die_price,
+          work_name: item.work_name,
+          die_code: item.die_code,
+          price: Number(item.rate || 0),
+          quantity: Number(item.quantity || 1),
+        })));
+        setDiscountAmount(String(bill.discount || "0.00"));
+        setPaymentMode(String(bill.payment_method || "CASH").toLowerCase());
+        setCustomerMessage(`Editing ${bill.bill_number} for ${customer.name}`);
+        setCustomerMessageType("success");
+        setMessage(`Edit mode: update ${bill.bill_number}, or create a new bill from these details.`);
+        setMessageType("success");
+      } catch (loadError) {
+        if (active) {
+          setError(loadError.response?.data?.detail || loadError.message || "Unable to load bill for editing.");
+          setErrorType("error");
+        }
+      } finally {
+        if (active) setEditLoading(false);
+      }
+    };
+
+    loadBillForEditing();
+    return () => { active = false; };
+  }, [searchParams]);
 
   useEffect(() => {
     getBillingProfile()
@@ -313,6 +371,7 @@ function BillingPage() {
     setError("");
     setErrorType("");
     setCreatedBill(null);
+    setBillLocked(false);
 
     try {
       const customer = await getCustomerByMobile(customerMobile);
@@ -373,9 +432,36 @@ function BillingPage() {
     setError("");
     setErrorType("");
     setCreatedBill(null);
+    setBillLocked(false);
 
     try {
       const token = await getTokenByNumber(normalizedTokenNumber);
+      const existingBills = await getBills(token.token_number);
+
+      if (existingBills.length > 0) {
+        const existingBill = existingBills[0];
+        setSelectedCustomer({
+          id: token.customer,
+          customer_code: token.customer_code,
+          name: token.customer_name,
+          mobile: token.customer_mobile,
+        });
+        setCustomerMobile(token.customer_mobile || "");
+        setSelectedToken(token);
+        setTokenNumber(token.token_number);
+        setBillItems([]);
+        setDiscountAmount("0.00");
+        setGoldReturnWeight("");
+        setManualWeight("");
+        setCreatedBill(null);
+        setBillLocked(true);
+        setCustomerMessage(`This token already has a bill: ${existingBill.bill_number}`);
+        setCustomerMessageType("success");
+        setTokenMessage("BILL ALREADY PRINTED. This token is locked and cannot be billed again.");
+        setTokenMessageType("success");
+        return;
+      }
+
       const tokens = await getCustomerTokens(token.customer);
       const availableTokens = tokens.filter(
         (item) => money(item.remaining_gold) > 0
@@ -565,13 +651,6 @@ function BillingPage() {
             </div>
             ${profile.show_bill_footer ? `<div class="separator"></div><div class="footer">Thank You! Visit Again.<br />Please keep this bill safely.</div>` : ""}
           </div>
-          <script>
-            window.addEventListener("load", function () {
-              window.focus();
-              window.print();
-              setTimeout(function () { window.close(); }, 700);
-            });
-          </script>
         </body>
       </html>`);
     let printStarted = false;
@@ -589,7 +668,7 @@ function BillingPage() {
     return true;
   };
 
-  const createBillAndPrint = async () => {
+  const saveBillAndPrint = async ({ asNew = false } = {}) => {
     setError("");
     setErrorType("");
     setMessage("");
@@ -622,7 +701,7 @@ function BillingPage() {
     const weightInput = weightMode === "manual" && manualWeightAllowed ? manualWeight : goldReturnWeight;
     const goldReturn = money(weightInput);
 
-    if (weightMode === "machine" && machineStableWeight === null) {
+    if (!editingBill && weightMode === "machine" && machineStableWeight === null) {
       if (!automaticCaptureEnabled) {
         setError(
           manualWeightAllowed
@@ -646,9 +725,11 @@ function BillingPage() {
       return;
     }
 
-    if (goldReturn > money(selectedToken.remaining_gold)) {
+    const editableRemainingGold = money(selectedToken.remaining_gold)
+      + (editingBill && !asNew ? money(editingBill.gold_return) : 0);
+    if (goldReturn > editableRemainingGold) {
       setError(
-        `Gold return cannot exceed remaining gold(${ money(selectedToken.remaining_gold).toFixed(3)
+        `Gold return cannot exceed remaining gold(${ editableRemainingGold.toFixed(3)
   } gm).`
       );
       setErrorType("error");
@@ -682,16 +763,23 @@ function BillingPage() {
       };
 
       const [bill, latestPrintConfig] = await Promise.all([
-        createBill(payload),
+        editingBill && !asNew ? updateBill(editingBill.id, payload) : createBill(payload),
         getBillingProfile().catch(() => printConfig),
       ]);
       setPrintConfig((current) => ({ ...current, ...(latestPrintConfig || {}) }));
       setCreatedBill(bill);
+      if (asNew) {
+        setEditingBill(null);
+        navigate("/billing", { replace: true });
+      }
       const printed = printBill(bill, printWindow, latestPrintConfig);
+      if (!editingBill || asNew) {
+        setBillLocked(printed);
+      }
       setMessage(
         printed
-          ? `Bill created successfully: ${bill.bill_number}`
-          : `Bill created successfully: ${bill.bill_number}. Allow pop-ups to print it.`
+          ? `${editingBill && !asNew ? "Bill updated" : "Bill created"} successfully: ${bill.bill_number}`
+          : `${editingBill && !asNew ? "Bill updated" : "Bill created"} successfully: ${bill.bill_number}. Allow pop-ups to print it.`
       );
       setMessageType("success");
     } catch (err) {
@@ -702,6 +790,9 @@ function BillingPage() {
       setSaving(false);
     }
   };
+
+  const createBillAndPrint = () => saveBillAndPrint({ asNew: false });
+  const createNewBillFromEdit = () => saveBillAndPrint({ asNew: true });
 
   const printCreatedBill = () => {
     if (!createdBill) return;
@@ -733,6 +824,11 @@ function BillingPage() {
     setMessage("");
     setMessageType("");
     setCreatedBill(null);
+    setBillLocked(false);
+    setEditingBill(null);
+    if (searchParams.get("editBill")) {
+      navigate("/billing", { replace: true });
+    }
     setDieSearch("");
     setSelectedDieCategory("all");
   };
@@ -778,6 +874,12 @@ function BillingPage() {
 
           {message && <div className={`alert alert - ${ messageType } `}>{message}</div>}
           {error && <div className={`alert alert - ${ errorType } `}>{error}</div>}
+          {editLoading && <div className="billing-edit-banner">Loading bill details for editing...</div>}
+          {editingBill && !editLoading && (
+            <div className="billing-edit-banner">
+              <FaPencilAlt /> <span><strong>Edit mode:</strong> {editingBill.bill_number} is loaded. Update this bill or create a new bill using the same details.</span>
+            </div>
+          )}
 
           <div className="billing-top-input-grid">
             <div className="billing-section billing-card">
@@ -893,7 +995,7 @@ function BillingPage() {
                   ))}
                 </div>
 
-                <div className="billing-die-grid" ref={dieGridRef}>
+                <div className="billing-die-grid">
                   {visibleDies.map((die, index) => {
                     const itemInBill = billItems.find((item) => item.die_id === die.id);
                     return (
@@ -923,10 +1025,16 @@ function BillingPage() {
               </div>
 
               <div className="billing-gold-section billing-card billing-gold-panel">
-                <div className="billing-section-header">
-                  <label className="billing-section-label">GOLD RETURN (WEIGHT)</label>
+                <div className="billing-section-header billing-gold-heading">
+                  <div className="gold-panel-title">
+                    <span className="gold-panel-title-icon"><FaWeight /></span>
+                    <div>
+                    <label className="billing-section-label">GOLD RETURN (WEIGHT)</label>
+                    <p className="billing-gold-subtitle">Measure the gold being returned to the customer</p>
+                    </div>
+                  </div>
 
-                  <div className={`weight - lock - pill ${ weightMode === "manual" ? "unlocked" : "locked" } `}>
+                  <div className={`weight-lock-pill ${weightMode === "manual" ? "unlocked" : "locked"}`}>
                     {weightMode === "manual" ? <FaLockOpen /> : <FaLock />}
                     <span>
                       {weightMode === "manual"
@@ -944,11 +1052,12 @@ function BillingPage() {
                   <div className="gold-weight-display">
                     <FaWeight className="weight-icon" />
                     <div className="gold-weight-copy">
+                      <span className="weight-reading-label">CURRENT READING</span>
                       <div className="gold-weight-value">
                         {money(weightMode === "manual" ? manualWeight : goldReturnWeight).toFixed(3)}
                         <span>gm</span>
                       </div>
-                      <div className={`gold - weight - status ${ weightMode === "manual" ? "manual" : "success" } `}>
+                      <div className={`gold-weight-status ${weightMode === "manual" ? "manual" : "success"}`}>
                         {weightMode === "manual"
                           ? "Manual Weight Applied"
                           : machineStableWeight !== null
@@ -972,7 +1081,7 @@ function BillingPage() {
                               ? "Machine Not Connected"
                               : "Automatic Capture Disabled"}
                       </span>
-                      <div className={`capture - dot ${ weightMode === "manual" || machineConnected ? "active" : "" } `}></div>
+                      <div className={`capture-dot ${weightMode === "manual" || machineConnected ? "active" : ""}`}></div>
                     </div>
 
                     {machineConfig.weighing_machine_enabled && weightMode === "machine" && (
@@ -1004,16 +1113,23 @@ function BillingPage() {
 
                     {machineStatus === "no-signal" && (
                       <p className="billing-manual-weight-locked">
-                        No signal from the scale. Check the connection or switch to manual entry.
+                        Port is open, but the scale returned no weight. On the JE3002GE, set the RS-232
+                        interface to MT-SICS / 9600 baud / 8 data bits / no parity / 1 stop bit, then
+                        check that the BAFO BF-810 is connected to the scale's RS-232 socket. You can also
+                        switch to manual entry.
                       </p>
                     )}
                   </div>
                 </div>
 
                 <div className="gold-manual-section">
-                  <label className="billing-section-label">MANUAL ENTRY (IF AUTO CAPTURE FAILS)</label>
+                  <div className="gold-manual-heading">
+                    <label className="billing-section-label">MANUAL ENTRY</label>
+                    <span className="manual-entry-hint">Optional • Use if automatic capture is unavailable</span>
+                  </div>
                   <div className="manual-input-row">
                     <div className="manual-input-group">
+                      <FaWeight className="manual-entry-icon" aria-hidden="true" />
                       <input
                         type="number"
                         placeholder="Enter Weight Manually"
@@ -1122,20 +1238,6 @@ function BillingPage() {
                 </div>
 
                 <div className="billing-items-footer">
-                  <button
-                    type="button"
-                    className="btn-add-row"
-                    onClick={() => {
-                      if (visibleDies[0]) {
-                        addBillItem(visibleDies[0]);
-                      } else if (dieGridRef.current) {
-                        dieGridRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
-                      }
-                    }}
-                  >
-                    <FaPlus /> Add New Row
-                  </button>
-
                   <div className="billing-inline-total">
                     <span>Total Amount (Rs)</span>
                     <strong>{totalAmount.toFixed(2)}</strong>
@@ -1189,14 +1291,25 @@ function BillingPage() {
               </div>
 
               <div className="billing-actions">
-                <button
-                  type="button"
-                  className="btn-billing-print"
-                  onClick={createdBill ? printCreatedBill : createBillAndPrint}
-                  disabled={saving}
-                >
-                  {saving ? "Saving..." : <><FaPrint /> PRINT BILL</>}
-                </button>
+                {editingBill ? (
+                  <>
+                    <button type="button" className="btn-billing-print" onClick={() => saveBillAndPrint({ asNew: false })} disabled={saving || editLoading}>
+                      {saving ? "Updating..." : <><FaPencilAlt /> UPDATE BILL</>}
+                    </button>
+                    <button type="button" className="btn-billing-create-new" onClick={createNewBillFromEdit} disabled={saving || editLoading}>
+                      <FaPlus /> CREATE NEW BILL
+                    </button>
+                    {createdBill && <button type="button" className="btn-billing-secondary" onClick={printCreatedBill} disabled={saving}><FaPrint /> PRINT UPDATED</button>}
+                  </>
+                ) : billLocked ? (
+                  <button type="button" className="btn-billing-locked" disabled>
+                    <FaLock /> BILL ALREADY PRINTED
+                  </button>
+                ) : (
+                  <button type="button" className="btn-billing-print" onClick={createdBill ? printCreatedBill : createBillAndPrint} disabled={saving}>
+                    {saving ? "Saving..." : <><FaPrint /> PRINT BILL</>}
+                  </button>
+                )}
 
                 <button type="button" className="btn-billing-clear" onClick={handleClear}>
                   <FaClock /> CLEAR

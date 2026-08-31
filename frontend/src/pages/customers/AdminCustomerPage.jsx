@@ -4,6 +4,7 @@ import {
   FaChevronLeft,
   FaChevronRight,
   FaDownload,
+  FaEdit,
   FaFileInvoice,
   FaLock,
   FaPhoneAlt,
@@ -16,6 +17,7 @@ import {
   FaUsers,
 } from "react-icons/fa";
 
+import { useNavigate } from "react-router-dom";
 import Sidebar from "../../components/layout/Sidebar";
 import { getBills } from "../../services/billingService";
 import { getBillingProfile } from "../../services/settingsService";
@@ -60,6 +62,7 @@ const formatDate = (value) => {
 };
 
 function AdminCustomerPage() {
+  const navigate = useNavigate();
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
   const [customers, setCustomers] = useState([]);
   const [pagination, setPagination] = useState(EMPTY_PAGINATION);
@@ -71,6 +74,8 @@ function AdminCustomerPage() {
   const [updatingCustomerId, setUpdatingCustomerId] = useState(null);
   const [deletingCustomerId, setDeletingCustomerId] = useState(null);
   const [printingCustomerId, setPrintingCustomerId] = useState(null);
+  const [billPicker, setBillPicker] = useState(null);
+  const [loadingBillsForCustomer, setLoadingBillsForCustomer] = useState(null);
 
   const loadCustomers = async ({
     page = pagination.page,
@@ -202,6 +207,23 @@ function AdminCustomerPage() {
       setError("Unable to load this customer's bills.");
     } finally {
       setPrintingCustomerId(null);
+    }
+  };
+
+  const handleEditCustomerBills = async (customer) => {
+    setLoadingBillsForCustomer(customer.id);
+    setError("");
+    try {
+      const bills = await getBills(customer.mobile);
+      if (!bills.length) {
+        setError("This customer has no bills to edit.");
+        return;
+      }
+      setBillPicker({ customer, bills });
+    } catch {
+      setError("Unable to load this customer's bills.");
+    } finally {
+      setLoadingBillsForCustomer(null);
     }
   };
 
@@ -378,6 +400,16 @@ function AdminCustomerPage() {
                         </button>
                         <button
                           type="button"
+                          className="admin-customer-edit-button"
+                          onClick={() => handleEditCustomerBills(customer)}
+                          disabled={loadingBillsForCustomer === customer.id}
+                          title="Edit customer bill"
+                          aria-label="Edit customer bill"
+                        >
+                          <FaEdit />
+                        </button>
+                        <button
+                          type="button"
                           className={`admin-customer-access-button ${customer.staff_edit_unlocked ? "unlocked" : "locked"}`}
                           onClick={() => handleStaffEditAccess(customer)}
                           disabled={updatingCustomerId === customer.id}
@@ -416,6 +448,34 @@ function AdminCustomerPage() {
             </div>
           </footer>
         </section>
+
+        {billPicker && (
+          <div className="admin-bill-picker-backdrop" role="presentation" onClick={() => setBillPicker(null)}>
+            <section className="admin-bill-picker" role="dialog" aria-modal="true" aria-labelledby="bill-picker-title" onClick={(event) => event.stopPropagation()}>
+              <div className="admin-bill-picker-header">
+                <div>
+                  <h2 id="bill-picker-title">Select a bill to edit</h2>
+                  <p>{billPicker.customer.name} · {billPicker.customer.mobile}</p>
+                </div>
+                <button type="button" onClick={() => setBillPicker(null)} aria-label="Close bill selector">×</button>
+              </div>
+              <div className="admin-bill-picker-list">
+                {billPicker.bills.map((bill) => (
+                  <button
+                    key={bill.id}
+                    type="button"
+                    className="admin-bill-picker-item"
+                    onClick={() => navigate(`/billing?editBill=${bill.id}`)}
+                  >
+                    <span className="admin-bill-picker-icon"><FaFileInvoice /></span>
+                    <span><strong>{bill.bill_number}</strong><small>{formatDate(bill.created_at)} · {bill.items?.length || 0} items</small></span>
+                    <b>{formatCurrency(bill.final_amount)}</b>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
       </main>
     </div>
   );

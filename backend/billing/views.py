@@ -48,6 +48,17 @@ class BillDetailView(
     serializer_class = BillSerializer
     permission_classes = [IsAuthenticated]
 
+    def update(self, request, *args, **kwargs):
+        if not request.user.is_superuser:
+            from rest_framework.response import Response
+            from rest_framework import status
+
+            return Response(
+                {"detail": "Only administrators can edit bills."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return super().update(request, *args, **kwargs)
+
     def get_queryset(self):
         return Bill.objects.select_related(
             "customer",
