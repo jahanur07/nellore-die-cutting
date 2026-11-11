@@ -2,28 +2,42 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
+from django.core.exceptions import ImproperlyConfigured
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-LOCAL_DEVELOPMENT = os.getenv("DJANGO_LOCAL", "").lower() in {"1", "true", "yes"}
+DEPLOYMENT_ENV = os.getenv("DJANGO_ENV", "development").lower()
+LOCAL_DEVELOPMENT = DEPLOYMENT_ENV != "production"
+
+
+def env_list(name, default=""):
+    """Read a comma-separated environment variable as a trimmed list."""
+    return [item.strip() for item in os.getenv(name, default).split(",") if item.strip()]
 
 # -----------------------------------------------------------------------------
 # Security
 # -----------------------------------------------------------------------------
 
-SECRET_KEY = "r-!v@sfj!h6u!b0)@c_e6gk9=+e*1!)tc1iz2ilk2je5!-8=5p"
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "")
+if not SECRET_KEY:
+    if not LOCAL_DEVELOPMENT:
+        raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set in production")
+    SECRET_KEY = "development-only-change-me"
 
-DEBUG = LOCAL_DEVELOPMENT
+DEBUG = os.getenv("DJANGO_DEBUG", "true" if LOCAL_DEVELOPMENT else "false").lower() in {
+    "1", "true", "yes"
+}
 
-ALLOWED_HOSTS = [
-    "api.editkaro.com",
-    "www.api.editkaro.com",
-    "localhost",
-    "127.0.0.1",
-]
+ALLOWED_HOSTS = env_list(
+    "DJANGO_ALLOWED_HOSTS",
+    "api.editkaro.com,www.api.editkaro.com,localhost,127.0.0.1",
+)
 
 SECURE_SSL_REDIRECT = not LOCAL_DEVELOPMENT
 SESSION_COOKIE_SECURE = not LOCAL_DEVELOPMENT
 CSRF_COOKIE_SECURE = not LOCAL_DEVELOPMENT
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "0"))
 
 # -----------------------------------------------------------------------------
 # Applications
@@ -157,30 +171,32 @@ SIMPLE_JWT = {
 # Frontend URL
 # -----------------------------------------------------------------------------
 
-FRONTEND_URL = "https://editkaro.com"
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://127.0.0.1:5173")
 
 # -----------------------------------------------------------------------------
 # Email
 # -----------------------------------------------------------------------------
 
-DEFAULT_FROM_EMAIL = "no-reply@nellorediecutting.local"
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL", "no-reply@nellorediecutting.local"
+)
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
-EMAIL_HOST = ""
-EMAIL_PORT = 587
-EMAIL_HOST_USER = ""
-EMAIL_HOST_PASSWORD = ""
-EMAIL_USE_TLS = True
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() in {"1", "true", "yes"}
 
 # -----------------------------------------------------------------------------
 # CORS
 # -----------------------------------------------------------------------------
 
-CORS_ALLOWED_ORIGINS = [
-    "https://editkaro.com",
-    "https://www.editkaro.com",
-]
+CORS_ALLOWED_ORIGINS = env_list(
+    "CORS_ALLOWED_ORIGINS",
+    "https://editkaro.com,https://www.editkaro.com",
+)
 
 if LOCAL_DEVELOPMENT:
     CORS_ALLOWED_ORIGINS += [
@@ -188,10 +204,10 @@ if LOCAL_DEVELOPMENT:
         "http://127.0.0.1:5173",
     ]
 
-CSRF_TRUSTED_ORIGINS = [
-    "https://editkaro.com",
-    "https://www.editkaro.com",
-]
+CSRF_TRUSTED_ORIGINS = env_list(
+    "CSRF_TRUSTED_ORIGINS",
+    "https://editkaro.com,https://www.editkaro.com",
+)
 
 if LOCAL_DEVELOPMENT:
     CSRF_TRUSTED_ORIGINS += [
