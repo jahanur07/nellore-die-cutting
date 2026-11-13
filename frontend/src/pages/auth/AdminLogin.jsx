@@ -52,7 +52,9 @@ function AdminLogin() {
     <main className="admin-login-page">
       <section className="admin-login-shell" aria-label="Nellore Die Cutting admin login">
         <div className="admin-login-brand">
-          <div className="admin-login-mark" aria-label="NDC">NDC</div>
+          <div className="admin-login-mark" aria-label="Nellore Die Cutting">
+            <img src="/nellore-die-cutting-logo.jpeg" alt="Nellore Die Cutting logo" />
+          </div>
           <div className="admin-login-name">NELLORE</div>
           <div className="admin-login-service">DIE CUTTING</div>
           <p><span /> Jewellery Die Cutting <span /></p>

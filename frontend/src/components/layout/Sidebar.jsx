@@ -49,7 +49,9 @@ function Sidebar() {
   return (
     <aside className="sidebar">
       <div className="sidebar-brand">
-        <div className="small-logo">NDC</div>
+        <div className="small-logo">
+          <img src="/nellore-die-cutting-logo.jpeg" alt="Nellore Die Cutting logo" />
+        </div>
 
         <h2>NELLORE</h2>
         <h3>DIE CUTTING</h3>

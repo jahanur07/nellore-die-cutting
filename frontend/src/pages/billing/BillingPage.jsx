@@ -114,6 +114,7 @@ function BillingPage() {
   const [tokenMessageType, setTokenMessageType] = useState("");
 
   const [createdBill, setCreatedBill] = useState(null);
+  const [lastBill, setLastBill] = useState(null);
   const [billLocked, setBillLocked] = useState(false);
   const [editingBill, setEditingBill] = useState(null);
   const [editLoading, setEditLoading] = useState(false);
@@ -130,6 +131,26 @@ function BillingPage() {
     };
 
     loadDies();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadLastBill = async () => {
+      try {
+        const bills = await getBills();
+        const latestBill = bills?.[0];
+        if (!active || !latestBill?.id) return;
+
+        const bill = await getBillById(latestBill.id);
+        if (active) setLastBill(bill);
+      } catch {
+        // Printing the last bill is optional; keep the page usable if history is unavailable.
+      }
+    };
+
+    loadLastBill();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -312,6 +333,18 @@ function BillingPage() {
   const parsedDiscount = printConfig.show_discount ? Math.max(0, money(discountAmount)) : 0;
   const finalAmount = Math.max(totalAmount - parsedDiscount, 0);
 
+  const enteredGoldReturn = money(weightMode === "manual" ? manualWeight : goldReturnWeight);
+  const savedGoldReturn = money(selectedToken?.total_returned);
+  const editedBillGoldReturn = money(editingBill?.gold_return);
+  const displayedGoldReturned = Math.max(
+    0,
+    savedGoldReturn - (editingBill ? editedBillGoldReturn : 0) + enteredGoldReturn
+  );
+  const displayedGoldRemaining = Math.max(
+    0,
+    money(selectedToken?.gold_weight) - displayedGoldReturned
+  );
+
   const now = new Date();
   const billDateMain = now.toLocaleDateString("en-GB", {
     day: "2-digit",
@@ -440,6 +473,7 @@ function BillingPage() {
 
       if (existingBills.length > 0) {
         const existingBill = existingBills[0];
+        const lastBill = existingBill?.id ? await getBillById(existingBill.id) : existingBill;
         setSelectedCustomer({
           id: token.customer,
           customer_code: token.customer_code,
@@ -453,7 +487,8 @@ function BillingPage() {
         setDiscountAmount("0.00");
         setGoldReturnWeight("");
         setManualWeight("");
-        setCreatedBill(null);
+        setCreatedBill(lastBill);
+        setLastBill(lastBill);
         setBillLocked(true);
         setCustomerMessage(`This token already has a bill: ${existingBill.bill_number}`);
         setCustomerMessageType("success");
@@ -570,8 +605,9 @@ function BillingPage() {
     const paymentMethod = escapePrintText(bill.payment_method || "");
     const rows = (bill.items || [])
       .map(
-        (item) => `
+        (item, index) => `
           <tr>
+            <td>${index + 1}</td>
             <td>${escapePrintText(formatDieNumber(item.work_name || item.die_code || ""))}</td>
             <td>${item.quantity || 0}</td>
             <td>${Number(item.rate || 0).toFixed(2)}</td>
@@ -638,7 +674,7 @@ function BillingPage() {
               <div class="gold-return-value">${Number(bill.gold_return || 0).toFixed(3)} gm</div>
             </div>
             <table class="items">
-              <thead><tr><th>Die</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
+              <thead><tr><th>S.No</th><th>Die</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>
             <div class="total">
@@ -768,6 +804,7 @@ function BillingPage() {
       ]);
       setPrintConfig((current) => ({ ...current, ...(latestPrintConfig || {}) }));
       setCreatedBill(bill);
+      setLastBill(bill);
       if (asNew) {
         setEditingBill(null);
         navigate("/billing", { replace: true });
@@ -798,6 +835,15 @@ function BillingPage() {
     if (!createdBill) return;
 
     if (!printBill(createdBill)) {
+      setError("Printing was blocked by the browser. Please allow pop-ups and try again.");
+      setErrorType("error");
+    }
+  };
+
+  const printLastBill = () => {
+    if (!lastBill) return;
+
+    if (!printBill(lastBill)) {
       setError("Printing was blocked by the browser. Please allow pop-ups and try again.");
       setErrorType("error");
     }
@@ -955,11 +1001,11 @@ function BillingPage() {
                   </div>
                   <div>
                     <span>Returned</span>
-                    <strong>{Number(selectedToken.total_returned || 0).toFixed(3)} gm</strong>
+                    <strong>{displayedGoldReturned.toFixed(3)} gm</strong>
                   </div>
                   <div>
                     <span>Remaining</span>
-                    <strong>{Number(selectedToken.remaining_gold || 0).toFixed(3)} gm</strong>
+                    <strong>{displayedGoldRemaining.toFixed(3)} gm</strong>
                   </div>
                 </div>
               )}
@@ -1310,6 +1356,16 @@ function BillingPage() {
                     {saving ? "Saving..." : <><FaPrint /> PRINT BILL</>}
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  className="btn-billing-secondary"
+                  onClick={printLastBill}
+                  disabled={saving || !lastBill}
+                  title={lastBill ? "Print the last bill" : "No bill has been created yet"}
+                >
+                  <FaPrint /> PRINT LAST BILL
+                </button>
 
                 <button type="button" className="btn-billing-clear" onClick={handleClear}>
                   <FaClock /> CLEAR

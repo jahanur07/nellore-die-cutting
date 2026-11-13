@@ -1557,6 +1557,14 @@ input {
   font-size: 11px;
 }
 
+.small-logo img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
 .sidebar-brand h2 {
   color: #fff19a;
   letter-spacing: 1px;
@@ -12138,10 +12146,15 @@ canvas {
 /* Shared professional sidebar */
 @media (min-width: 768px) {
   .sidebar {
-    position: relative;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
     z-index: 5;
     width: 246px;
     min-width: 246px;
+    height: 100vh;
+    max-height: 100vh;
+    overflow-y: auto;
     padding: 24px 14px 18px;
     background: #173b27;
     box-shadow: 7px 0 24px rgba(24, 55, 36, .08);
@@ -12433,6 +12446,15 @@ canvas {
   background: rgba(255, 255, 255, .04);
   font-size: 22px;
   box-shadow: 0 9px 20px rgba(0, 0, 0, .16);
+}
+
+.admin-login-mark img,
+.staff-login-badge img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  border-radius: inherit;
 }
 
 .admin-login-name {

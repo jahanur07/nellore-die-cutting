@@ -93,7 +93,9 @@ function StaffLogin() {
     <main className="staff-login-page">
       <section className="staff-login-shell" aria-label="Nellore Die Cutting staff login">
         <header className="staff-login-brand">
-          <div className="staff-login-badge"><span>NDC</span></div>
+          <div className="staff-login-badge">
+            <img src="/nellore-die-cutting-logo.jpeg" alt="Nellore Die Cutting logo" />
+          </div>
           <p>NELLORE</p>
           <h1>DIE CUTTING</h1>
           <div className="staff-login-tagline"><span />Jewellery Die Cutting<span /></div>

@@ -375,7 +375,7 @@ function MasterPage() {
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-    } catch (err) {
+    } catch {
       setError("Unable to download the Excel template.");
     }
   };

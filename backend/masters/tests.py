@@ -2,6 +2,13 @@ from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from unittest import skipUnless
+from io import BytesIO
+
+try:
+	import openpyxl
+except ImportError:
+	openpyxl = None
 
 from .models import DiePrice
 
@@ -70,3 +77,23 @@ class DiePricePermissionTests(APITestCase):
 
 		self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 		self.assertTrue(DiePrice.objects.filter(name="Admin Die").exists())
+
+	@skipUnless(openpyxl, "openpyxl is required for Excel template generation")
+	def test_superuser_can_download_excel_template(self):
+		self.client.force_authenticate(user=self.admin)
+
+		response = self.client.get(
+			reverse("die-price-template")
+		)
+
+		self.assertEqual(response.status_code, status.HTTP_200_OK)
+		self.assertEqual(
+			response["Content-Type"],
+			"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		)
+		self.assertIn(
+			'die-price-import-template.xlsx',
+			response["Content-Disposition"],
+		)
+		workbook = openpyxl.load_workbook(BytesIO(response.content))
+		self.assertEqual(workbook.sheetnames, ["Die Prices", "Instructions"])

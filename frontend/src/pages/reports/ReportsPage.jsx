@@ -233,6 +233,17 @@ function ReportsPage() {
 
   const exportReport = () => {
     try {
+      const generatedAt = new Date();
+      const generatedDateTime = generatedAt.toLocaleString("en-IN", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true,
+      });
+      const fileStamp = generatedAt.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const left = 40;
       let y = 44;
@@ -258,6 +269,8 @@ function ReportsPage() {
       doc.text(`Report Type: ${FILTER_OPTIONS.find((item) => item.key === mode)?.label || "Daily Summary"}`, left, y);
       y += 16;
       doc.text(`Period: ${headingDate.main} (${headingDate.sub})`, left, y);
+      y += 16;
+      doc.text(`Generated On: ${generatedDateTime}`, left, y);
       y += 20;
 
       doc.setDrawColor(220);
@@ -311,15 +324,15 @@ function ReportsPage() {
         });
       }
 
-      const stamp = new Date().toISOString().slice(0, 10);
-      doc.save(`ndc-report-${stamp}.pdf`);
+      doc.save(`ndc-report-${fileStamp}.pdf`);
     } catch {
       const backupContent = JSON.stringify(report, null, 2);
       const blob = new Blob([backupContent], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
-      anchor.download = `ndc-report-${new Date().toISOString().slice(0, 10)}.json`;
+      const fallbackStamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+      anchor.download = `ndc-report-${fallbackStamp}.json`;
       anchor.click();
       URL.revokeObjectURL(url);
     }

@@ -5,14 +5,19 @@ const escapeHtml = (value) => String(value ?? "")
   .replace(/"/g, "&quot;")
   .replace(/'/g, "&#039;");
 
+const formatDieNumber = (value) => {
+  const text = String(value ?? "").trim();
+  return /^\d+$/.test(text) ? `DIE - ${text.padStart(3, "0")}` : text;
+};
+
 export const printCustomerBills = (customer, bills, printWindow = null, printConfig = {}) => {
   const targetWindow = printWindow || window.open("", "_blank", "width=420,height=900");
   if (!targetWindow) return false;
 
   const billMarkup = bills.map((bill) => {
     const createdAt = bill.created_at ? new Date(bill.created_at) : new Date();
-    const rows = (bill.items || []).map((item) => `
-      <tr><td>${escapeHtml(item.die_code || item.work_name)}</td><td>${item.quantity || 0}</td>
+    const rows = (bill.items || []).map((item, index) => `
+      <tr><td>${index + 1}</td><td>${escapeHtml(formatDieNumber(item.work_name || item.die_code))}</td><td>${item.quantity || 0}</td>
       <td>${Number(item.rate || 0).toFixed(2)}</td><td>${Number(item.amount || 0).toFixed(2)}</td></tr>`).join("");
 
     return `<article class="receipt">
@@ -30,7 +35,7 @@ export const printCustomerBills = (customer, bills, printWindow = null, printCon
       </table>
       <div class="separator"></div>
       <div class="gold-return-box"><div class="gold-return-label">GOLD RETURN</div><div class="gold-return-value">${Number(bill.gold_return || 0).toFixed(3)} gm</div></div>
-      <table class="items"><thead><tr><th>Die</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
+      <table class="items"><thead><tr><th>S.No</th><th>Die</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead><tbody>${rows}</tbody></table>
       <div class="total"><div class="line"><span>Total Amount</span><b>₹ ${Number(bill.total_amount || 0).toFixed(2)}</b></div>
       <div class="line"><span>Discount</span><b>₹ ${Number(bill.discount || 0).toFixed(2)}</b></div></div>
       <div class="final-box"><div class="final-label">FINAL AMOUNT</div><div class="final-value">₹ ${Number(bill.final_amount || 0).toFixed(2)}</div></div>
