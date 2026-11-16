@@ -9,7 +9,7 @@
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev/)
 [![Django](https://img.shields.io/badge/Django-6.0-092E20?style=flat-square&logo=django&logoColor=white)](https://www.djangoproject.com/)
 [![DRF](https://img.shields.io/badge/Django%20REST%20Framework-3.16-A30000?style=flat-square)](https://www.django-rest-framework.org/)
-[![MySQL/SQLite](https://img.shields.io/badge/Database-SQLite%20(configured)-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![SQLite](https://img.shields.io/badge/Database-SQLite%20(local%20config)-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
 
 [**Live Application**](https://nellore-die-cutting-rho.vercel.app) · [**Source Code**](https://github.com/jahanur07/nellore-die-cutting)
