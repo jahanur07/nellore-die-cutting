@@ -12,7 +12,7 @@
 [![SQLite](https://img.shields.io/badge/Database-SQLite%20(local%20config)-003B57?style=flat-square&logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Vite](https://img.shields.io/badge/Vite-8-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
 
-[**Live Application**](https://nellore-die-cutting-rho.vercel.app) · [**Source Code**](https://github.com/jahanur07/nellore-die-cutting)
+[**Live Application**](http://nellorediecutting.shop/) · [**Source Code**](https://github.com/jahanur07/nellore-die-cutting)
 
 </div>
 
@@ -237,7 +237,7 @@ At a high level:
 - Use persistent production database and media storage.
 - Run migrations, collect static files and verify authentication, billing, reports, password reset and uploads after deployment.
 
-**Live frontend:** https://nellore-die-cutting-rho.vercel.app
+**Live frontend:** http://nellorediecutting.shop/
 
 ## 11. My contribution & what I learned
 
@@ -312,6 +312,6 @@ nellore-die-cutting/
 
 **React · Django REST Framework · Python · Full-Stack Development**
 
-[Live Application](https://nellore-die-cutting-rho.vercel.app) · [GitHub Repository](https://github.com/jahanur07/nellore-die-cutting)
+[Live Application](http://nellorediecutting.shop/) · [GitHub Repository](https://github.com/jahanur07/nellore-die-cutting)
 
 </div>
